@@ -28,16 +28,19 @@ pub fn get_unprefixed_instructions() -> Vec<Instruction> {
 	let instructions: Vec<Instruction> = vec![
 		Instruction::new(vec![0x00], 4, "NOP", NOP),
 
+		// any 8-bit instruction with [HL] takes longer
+
 		Instruction::new(vec![0x01, 0x11, 0x21, 0x31], 12, "LD r16, imm16", LD_R16_IMM),
+		Instruction::new(vec![0x06, 0x16, 0x26, 0x0E, 0x1E, 0x2E, 0x3E], 8, "LD r8, imm8", LD_R8_IMM),
+		Instruction::new(vec![0x36], 12, "LD r8, [HL]", LD_R8_IMM),
 		Instruction::new(vec![0x02, 0x12, 0x22, 0x32], 8, "LD [r16mem], A", LD_R16MEM_A),
 
 		Instruction::new(vec![0x03, 0x13, 0x23, 0x33], 8, "INC r16", INC_R16),
 		Instruction::new(vec![0x0B, 0x1B, 0x2B, 0x3B], 8, "DEC r16", DEC_R8),
-
-		Instruction::new(vec![0x04, 0x14, 0x24, 0x34], 12, "INC r8 (L)", INC_R8),
-		Instruction::new(vec![0x0C, 0x1C, 0x2C, 0x3C], 4, "INC r8, (R)", INC_R8),
-		Instruction::new(vec![0x05, 0x15, 0x25, 0x35], 12, "DEC r8 (L)", DEC_R8),
-		Instruction::new(vec![0x0D, 0x1D, 0x2D, 0x3D], 4, "DEC r8 (R)", DEC_R8),
+		Instruction::new(vec![0x04, 0x14, 0x24, 0x0C, 0x1C, 0x2C, 0x3C], 4, "INC r8", INC_R8),
+		Instruction::new(vec![0x34], 12, "INC [HL],", INC_R8),
+		Instruction::new(vec![0x05, 0x15, 0x25, 0x0D, 0x1D, 0x2D, 0x3D], 4, "DEC r8", DEC_R8),
+		Instruction::new(vec![0x35], 12, "DEC [HL]", DEC_R8),
 	];
 
 	instructions
@@ -61,7 +64,7 @@ fn NOP(cpu: &mut CPU, opcode: u8, cycles: u16) {
 /*
 
 MNEMONIC: NOP
-OPCODES: [0x00] 
+OPCODES: 0x00
 DESC: No-op; does nothing
 FLAGS: - - - -
 
@@ -95,6 +98,25 @@ fn LD_R16_IMM(cpu: &mut CPU, opcode: u8, cycles: u16) {
 
 	cpu.pc += 1;
 
+}
+
+/*
+
+MNEMONIC: LD r8, imm8
+OPCODES: 0x(0-3)6, 0x(0-3)E
+DESC: loads an 8 bit immediate into r8
+FLAGS: - - - -
+
+*/
+fn LD_R8_IMM(cpu: &mut CPU, opcode: u8, cycles: u16) {
+	let dest = Register8Bit::from_r8(opcode >> 4);
+
+	cpu.pc += 1;
+	let src = cpu.bus.read_byte(cpu.pc);
+
+	cpu.set_8bit_reg(dest, src);
+
+	cpu.pc += 1;
 }
 
 /*
@@ -182,16 +204,9 @@ fn INC_R8(cpu: &mut CPU, opcode: u8, cycles: u16) {
 
 	let old_carry = cpu.registers.get_flag(Flag::C);
 
-	if reg == Register8Bit::HL {
-		// increment the value the memory location stored in HL, set flags
-		let target = cpu.registers.get_16bit_reg(Register16Bit::HL);
-		let new_value = cpu.add_8bit(cpu.bus.read_byte(target), 1);
-		
-		cpu.bus.write_byte(target, new_value);
-	} else {
-		let new_value = cpu.add_8bit(cpu.registers.get_8bit_reg(reg), 1);
-		cpu.registers.set_8bit_reg(reg, new_value);
-	}
+	let old_value = cpu.get_8bit_reg(reg);
+	let new_value = cpu.add_8bit(old_value, 1);
+	cpu.set_8bit_reg(reg, new_value);
 
 	cpu.registers.set_flag(Flag::C, old_carry);
 
@@ -213,16 +228,9 @@ fn DEC_R8(cpu: &mut CPU, opcode: u8, cycles: u16) {
 
 	let old_carry = cpu.registers.get_flag(Flag::C);
 
-	if reg == Register8Bit::HL {
-		// decrement the value the memory location stored in HL, set flags
-		let target = cpu.registers.get_16bit_reg(Register16Bit::HL);
-		let new_value = cpu.sub_8bit(cpu.bus.read_byte(target), 1);
-		
-		cpu.bus.write_byte(target, new_value);
-	} else {
-		let new_value = cpu.sub_8bit(cpu.registers.get_8bit_reg(reg), 1);
-		cpu.registers.set_8bit_reg(reg, new_value);
-	}
+	let old_value = cpu.get_8bit_reg(reg);
+	let new_value = cpu.sub_8bit(old_value, 1);
+	cpu.set_8bit_reg(reg, new_value);
 
 	cpu.registers.set_flag(Flag::C, old_carry);
 

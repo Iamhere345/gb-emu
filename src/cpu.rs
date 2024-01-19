@@ -70,6 +70,34 @@ impl<'a> CPU<'a> {
 
 	}
 	
+	pub fn get_deref_hl(&self) -> u8 {
+		self.bus.read_byte(self.registers.get_16bit_reg(Register16Bit::HL))
+	}
+
+	pub fn set_deref_hl(&mut self, write: u8) {
+		self.bus.write_byte(self.registers.get_16bit_reg(Register16Bit::HL), write);
+	}
+
+	/*
+		8bit register wrappers that include [HL]
+	*/
+
+	pub fn get_8bit_reg(&mut self, reg: Register8Bit) -> u8 {
+		if reg == Register8Bit::HL {
+			self.get_deref_hl()
+		} else {
+			self.registers.get_8bit_reg(reg)
+		}
+	}
+
+	pub fn set_8bit_reg(&mut self, reg: Register8Bit, write: u8) {
+		if reg == Register8Bit::HL {
+			self.set_deref_hl(write);
+		} else {
+			self.registers.set_8bit_reg(reg, write);
+		}
+	}
+
 	// adds rhs to reg, update flags
 	pub fn add_8bit(&mut self, lhs: u8, rhs: u8) -> u8 {
 		let (new_value, did_overflow) = lhs.overflowing_add(rhs);
