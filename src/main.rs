@@ -24,6 +24,8 @@ fn main() {
 	let instructions = get_unprefixed_instructions();
 	let prefixed_instructions = get_prefixed_instructions();
 
+	cpu.pc = 0x100;
+
 	cpu.cycle(&instructions, &prefixed_instructions);
 	cpu.cycle(&instructions, &prefixed_instructions);
 	cpu.cycle(&instructions, &prefixed_instructions);
