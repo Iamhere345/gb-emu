@@ -22,15 +22,6 @@ impl<'a> CPU<'a> {
 
 	pub fn cycle(&mut self, instructions: &Vec<Instruction>, prefixed_instructions: &Vec<Instruction>) {
 
-		// detect prefix byte CB
-
-			// decode opcode
-			// based on opcode, decode displacement and immediate data bytes
-		
-		// detect prefix bytes DD/FD, CB
-			// displacement byte
-			// opcode
-
 		// TODO check if the amount of cycles for an instruction includes fetching the byte after a prefix and immediates (i think it does)
 
 		let mut byte: u8 = self.bus.read_byte(self.pc);
@@ -46,7 +37,6 @@ impl<'a> CPU<'a> {
 			self.pc += 1;
 			byte = self.bus.read_byte(self.pc);
 
-			// TODO look into DD FD prefixes (i think they might be z80 only but they're still specified in some documents)
 		} else {
 			instruction_set = &instructions;
 		}
