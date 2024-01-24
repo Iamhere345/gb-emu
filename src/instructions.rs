@@ -53,6 +53,13 @@ pub fn get_unprefixed_instructions() -> Vec<Instruction> {
 
 		Instruction::new(vec![0x09, 0x19, 0x29, 0x39], 8, "ADD HL, r16", ADD_HL_R16),
 
+		// shift, rotate and bit instructions
+		Instruction::new(vec![0x07], 4, "RLCA", RLCA_RRCA),
+		Instruction::new(vec![0x0F], 4, "RRCA", RLCA_RRCA),
+
+		Instruction::new(vec![0x17], 4, "RLA", RLA_RRA),
+		Instruction::new(vec![0x1F], 4, "RRA", RLA_RRA),
+
 	];
 
 	instructions
@@ -320,6 +327,68 @@ fn ADD_HL_R16(cpu: &mut CPU, opcode: u8, cycles: u16) {
 	cpu.registers.set_16bit_reg(Register16Bit::HL, new_hl);
 
 	cpu.registers.set_flag(Flag::Z, old_z);
+
+	cpu.pc += 1;
+}
+
+// ! 8-bit shift, rotate and bit instructions
+
+/*
+
+MNEMONIC: RLCA, RRCA
+OPCODES: 0x07, 0x0F
+DESC: Shifts the A register to the left. The carry bit is set to the shifted out bit
+FLAGS: 0 0 0 C
+
+*/
+fn RLCA_RRCA(cpu: &mut CPU, opcode: u8, cycles: u16) {
+
+	let (new_value, carry): (u8, bool);
+
+	if opcode >> 3 == 0 {
+		// RRCA
+		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shl(1);
+	} else {
+		//RLCA
+		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shr(1);
+	}
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::C, carry);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: RLA, RRA
+OPCODES: 0x00
+DESC: Shifts the A register to the left. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
+FLAGS: 0 0 0 C
+
+*/
+fn RLA_RRA(cpu: &mut CPU, opcode: u8, cycles: u16) {
+
+	let (new_value, carry): (u8, bool);
+	let is_rla = (opcode & 0x8) >> 3 == 0;
+
+	if is_rla {
+		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shl(1);
+	} else {
+		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shr(1);
+	}
+
+	let old_carry = match is_rla {
+		true => cpu.registers.get_flag(Flag::C) as u8,
+		false => (cpu.registers.get_flag(Flag::C) as u8) << 7
+	};
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value | old_carry);
+
+	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::C, carry);
 
 	cpu.pc += 1;
 }
