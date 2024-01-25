@@ -32,6 +32,10 @@ pub fn get_unprefixed_instructions() -> Vec<Instruction> {
 
 		// misc instructions
 		Instruction::new(vec![0x0], 4, "NOP", NOP),
+		Instruction::new(vec![0x2F], 4, "CPL", CPL),
+		Instruction::new(vec![0x3F], 4, "CCF", CCF),
+		Instruction::new(vec![0x37], 4, "SCF", SCF),
+		Instruction::new(vec![0x27], 4, "DAA", DAA),
 
 		// memory instructions
 		Instruction::new(vec![0x01, 0x11, 0x21, 0x31], 12, "LD r16, imm16", LD_R16_IMM),
@@ -75,12 +79,6 @@ pub fn get_prefixed_instructions() -> Vec<Instruction> {
 // ! misc instructions
 
 /*
-fn NOP(cpu: &mut CPU, opcode: u8, cycles: u16) {
-	
-}
-*/
-
-/*
 
 MNEMONIC: NOP
 OPCODES: 0x00
@@ -91,6 +89,104 @@ FLAGS: - - - -
 fn NOP(cpu: &mut CPU, opcode: u8, cycles: u16) {
 	cpu.pc += 1;
 }
+
+/*
+
+MNEMONIC: CPL
+OPCODES: 0x2F
+DESC: Flips the A register (!A)
+FLAGS: - N H -
+
+*/
+fn CPL(cpu: &mut CPU, opcode: u8, cycles: u16) {
+	let new_value = !cpu.registers.get_8bit_reg(Register8Bit::A);
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.registers.set_flag(Flag::N, true);
+	cpu.registers.set_flag(Flag::H, true);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: CCF
+OPCODES: 0x3F
+DESC: Flips the carry flag, zeros N and H flags
+FLAGS: - 0 0 !C
+
+*/
+fn CCF(cpu: &mut CPU, opcode: u8, cycles: u16) {
+
+	cpu.registers.set_flag(Flag::N, false);
+	cpu.registers.set_flag(Flag::H, false);
+	cpu.registers.set_flag(Flag::C, !cpu.registers.get_flag(Flag::C));
+	
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: SCF
+OPCODES: 0x3F
+DESC: Sets the carry flag, zeros N and H flags
+FLAGS: - 0 0 1
+
+*/
+fn SCF(cpu: &mut CPU, opcode: u8, cycles: u16) {
+
+	cpu.registers.set_flag(Flag::N, false);
+	cpu.registers.set_flag(Flag::H, false);
+	cpu.registers.set_flag(Flag::C, true);
+	
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: DAA
+OPCODES: 0x00
+DESC: For Binary-coded decimal numbers (https://blog.ollien.com/posts/gb-daa/)
+FLAGS: - - - -
+
+*/
+fn DAA(cpu: &mut CPU, opcode: u8, cycles: u16) {
+
+	let mut offset: u8 = 0;
+	let mut should_carry = false;
+
+	let old_value = cpu.registers.get_8bit_reg(Register8Bit::A);
+
+	let half_carry = cpu.registers.get_flag(Flag::H);
+	let carry = cpu.registers.get_flag(Flag::C);
+	let subtract = cpu.registers.get_flag(Flag::N);
+
+	if (subtract == false && old_value & 0xF > 0x09) || half_carry == false {
+		offset |= 0x06;
+	}
+
+	if (subtract == false && old_value > 0x99) || carry == true {
+		offset |= 0x60;
+		should_carry = true;
+	}
+
+	let new_value = match subtract {
+		true => old_value.wrapping_sub(offset),
+		false => old_value.wrapping_add(offset)
+	};
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.registers.set_flag(Flag::Z, new_value == 0);
+	cpu.registers.set_flag(Flag::H, false);
+	cpu.registers.set_flag(Flag::C, should_carry);
+
+	cpu.pc += 1;
+}
+
 
 // ! memory instructions
 
