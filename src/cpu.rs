@@ -1,4 +1,4 @@
 pub mod cpu;
-mod registers;
+pub mod registers;
 mod instructions;
 mod decode;
