@@ -1,15 +1,12 @@
 use std::fs::File;
 use std::io::prelude::*;
+use std::iter;
 
 use bus::*;
-use cpu::*;
-use instructions::*;
-use registers::*;
+use cpu::cpu::CPU;
 
 mod cpu;
-mod registers;
 mod bus;
-mod instructions;
 
 fn main() {
     
@@ -22,20 +19,10 @@ fn main() {
 		cpu.bus.write_byte(addr.try_into().unwrap(), *byte);
 	}
 
-	let instructions = get_unprefixed_instructions();
-	let prefixed_instructions = get_prefixed_instructions();
-
 	cpu.pc = 0x0;
 
-	cpu.cycle(&instructions, &prefixed_instructions);
-	cpu.cycle(&instructions, &prefixed_instructions);
-	cpu.cycle(&instructions, &prefixed_instructions);
-	cpu.cycle(&instructions, &prefixed_instructions);
-	println!("{}", cpu.registers.get_16bit_reg(Register16Bit::HL));
-	println!("{}", cpu.registers.get_16bit_reg(Register16Bit::BC));
-	cpu.cycle(&instructions, &prefixed_instructions);
-
-
-	println!("{}", cpu.registers.get_16bit_reg(Register16Bit::HL));
+	for i in 0..10 {
+		cpu.cycle();
+	}
 
 }
