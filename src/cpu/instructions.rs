@@ -62,6 +62,27 @@ lazy_static!{
 		Instruction::new(vec![0x08], 20, "LD [a16], SP", LD_A16_SP),
 
 		// arithmetic instructions
+		Instruction::new(vec![0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87], 4, "ADD A, r8", ADD_ADC),
+		Instruction::new(vec![0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F], 4, "ADC A, r8", ADD_ADC),
+		Instruction::new(vec![0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97], 4, "SUB A, r8", SUB_SBC),
+		Instruction::new(vec![0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F], 4, "SBC A, r8", SUB_SBC),
+
+		Instruction::new(vec![0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7], 4, "AND A, r8", AND),
+		Instruction::new(vec![0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF], 4, "XOR A, r8", XOR),
+
+		Instruction::new(vec![0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7], 4, "OR A, r8", OR),
+		Instruction::new(vec![0xB8, 0xB9, 0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF], 4, "CP A, r8", CP),
+
+		Instruction::new(vec![0xC6], 8, "ADD A, n8", ADD_ADC),
+		Instruction::new(vec![0xCE], 8, "ADC A, n8", ADD_ADC),
+		Instruction::new(vec![0xD6], 8, "SUB A, n8", SUB_SBC),
+		Instruction::new(vec![0xDE], 8, "SBC A, n8", SUB_SBC),
+		Instruction::new(vec![0xE6], 8, "AND A, n8", AND),
+		Instruction::new(vec![0xEE], 8, "XOR A, n8", XOR),
+		Instruction::new(vec![0xF6], 8, "OR A, n8", OR),
+		Instruction::new(vec![0xFE], 8, "CP A, n8", CP),
+
+
 		Instruction::new(vec![0x03, 0x13, 0x23, 0x33], 8, "INC r16", INC_R16),
 		Instruction::new(vec![0x0B, 0x1B, 0x2B, 0x3B], 8, "DEC r16", DEC_R16),
 		Instruction::new(vec![0x04, 0x14, 0x24, 0x0C, 0x1C, 0x2C, 0x3C], 4, "INC r8", INC_R8),
@@ -387,6 +408,195 @@ fn LD_A16_SP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 
 // ! arithmetic instructions
+
+/*
+
+MNEMONIC: ADD A, r8 / ADC A, r8
+OPCODES: 0x8(0-F)
+DESC: Adds r8 to A
+FLAGS: Z 0 H C
+
+*/
+fn ADD_ADC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let a_value = cpu.get_8bit_reg(Register8Bit::A);
+	let rhs_value = match opcode {
+		0xC6 | 0xCE => {
+			get_imm8(cpu)
+		},
+		_ => {
+			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
+			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+		},
+	};
+
+	let mut new_value = cpu.add_8bit(a_value, rhs_value);
+
+	if ((opcode & 8) != 0 || opcode == 0xCE) && cpu.registers.get_flag(Flag::C) {
+		// add carry bit
+		new_value = cpu.add_8bit(new_value, 1);
+	}
+
+	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: SUB A, r8 / SBC A, r8
+OPCODES: 0x8(0-F)
+DESC: Subtracts r8 from A
+FLAGS: Z 1 H C
+
+*/
+fn SUB_SBC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let a_value = cpu.get_8bit_reg(Register8Bit::A);
+	let rhs_value = match opcode {
+		0xD6 | 0xDE => {
+			*cycles = 8;
+			get_imm8(cpu)
+		},
+		_ => {
+			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
+			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+		},
+	};
+
+	let mut new_value = cpu.sub_8bit(a_value, rhs_value);
+
+	if ((opcode & 8) != 0 || opcode == 0xDE) && cpu.registers.get_flag(Flag::C) {
+		// subtract carry bit
+		new_value = cpu.sub_8bit(new_value, 1);
+	}
+
+	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: AND A, r8
+OPCODES: 0xA(0-7)
+DESC: Ands r8 with A
+FLAGS: Z - 1 -
+
+*/
+fn AND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let a_value = cpu.get_8bit_reg(Register8Bit::A);
+	let rhs_value = match opcode {
+		0xE6 => {
+			*cycles = 8;
+			get_imm8(cpu)
+		},
+		_ => {
+			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
+			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+		},
+	};
+
+	let new_value = a_value & rhs_value;
+	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	if new_value == 0 {
+		cpu.registers.set_flag(Flag::Z, true);
+	}
+
+	cpu.registers.set_flag(Flag::H, true);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: XOR A, r8
+OPCODES: 0xA(0-7)
+DESC: Xors r8 with A
+FLAGS: Z - - -
+
+*/
+fn XOR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let a_value = cpu.get_8bit_reg(Register8Bit::A);
+	let rhs_value = match opcode {
+		0xEE => {
+			*cycles = 8;
+			get_imm8(cpu)
+		},
+		_ => {
+			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
+			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+		},
+	};
+
+	let new_value = a_value ^ rhs_value;
+	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	if new_value == 0 {
+		cpu.registers.set_flag(Flag::Z, true);
+	}
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: OR A, r8
+OPCODES: 0xA(0-7)
+DESC: Ors r8 with A
+FLAGS: Z - - -
+
+*/
+fn OR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let a_value = cpu.get_8bit_reg(Register8Bit::A);
+	let rhs_value = match opcode {
+		0xF6 => {
+			*cycles = 8;
+			get_imm8(cpu)
+		},
+		_ => {
+			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
+			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+		},
+	};
+
+	let new_value = a_value | rhs_value;
+	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	if new_value == 0 {
+		cpu.registers.set_flag(Flag::Z, true);
+	}
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: CP A, r8
+OPCODES: 0x8(0-F)
+DESC: Subtracts r8 from A, doesn't set A
+FLAGS: Z 1 H C
+
+*/
+fn CP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let a_value = cpu.get_8bit_reg(Register8Bit::A);
+	let rhs_value = match opcode {
+		0xFE => {
+			*cycles = 8;
+			get_imm8(cpu)
+		},
+		_ => {
+			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
+			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+		},
+	};
+
+	cpu.sub_8bit(a_value, rhs_value);
+
+	cpu.pc += 1;
+}
 
 /*
 
