@@ -19,7 +19,7 @@ impl<'a> CPU<'a> {
 		}
 	}
 
-	pub fn cycle(&mut self) {
+	pub fn cycle(&mut self) -> u8 {
 
 		// TODO check if the amount of cycles for an instruction includes fetching the byte after a prefix and immediates (i think it does)
 
@@ -51,12 +51,13 @@ impl<'a> CPU<'a> {
 					(instruction.exec)(self, byte, &mut cycles);
 
 					// TODO wait clock_speed * cycles after the instruction has been executed
-					return;
+					return 0;
 				}
 			}
 		}
 
 		println!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
+		return 1;
 		
 
 	}

@@ -71,6 +71,11 @@ impl Bus {
 			return self.memory[addr as usize];
 		}
 
+		// gameboy doctor
+		if addr == 0xFF44 {
+			return 0x90;
+		}
+
 		0
 
 	}
