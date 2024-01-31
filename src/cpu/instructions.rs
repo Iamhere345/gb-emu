@@ -61,6 +61,13 @@ lazy_static!{
 		Instruction::new(vec![0x36], 12, "LD r8, [HL]", LD_R8_IMM),
 		Instruction::new(vec![0x02, 0x12, 0x22, 0x32], 8, "LD [r16mem], A", LD_R16MEM_A),
 		Instruction::new(vec![0x0A, 0x1A, 0x2A, 0x3A], 8, "LD A, [r16mem]", LD_A_R16MEM),
+		Instruction::new(vec![0xFA], 16, "LD A, [a16]", LD_A_A16),
+		Instruction::new(vec![0xEA], 16, "LD [a16], A", LD_A16_A),
+
+		Instruction::new(vec![0xF0], 12, "LDH A, [a8]", LDH_A_A8),
+		Instruction::new(vec![0xE0], 12, "LDH [a8], A", LDH_A8_A),
+		Instruction::new(vec![0xF2], 8, "LDH A, [C]", LDH_A_C),
+		Instruction::new(vec![0xE2], 8, "LDH [C], A", LDH_C_A),
 
 		// stack instructions
 		Instruction::new(vec![0x08], 20, "LD [a16], SP", LD_A16_SP),
@@ -524,6 +531,109 @@ fn LD_A_R16MEM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.pc += 1;
 
+}
+
+/*
+
+MNEMONIC: LD A, [a16]
+OPCODES: 0xFA
+DESC: Loads the value stored in address a16 into A
+FLAGS: - - - -
+
+*/
+fn LD_A_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let addr = get_imm16(cpu);
+	let new_value = cpu.bus.read_byte(addr);
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: LD [a16], A
+OPCODES: 0xEA
+DESC: Loads the value stored in A into address a16
+FLAGS: - - - -
+
+*/
+fn LD_A16_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let addr = get_imm16(cpu);
+	let a_value = cpu.registers.get_8bit_reg(Register8Bit::A);
+
+	cpu.bus.write_byte(addr, a_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: LDH A, [a8]
+OPCODES: 0xF0
+DESC: Loads the value stored at 0xFF00+a8 into A
+FLAGS: - - - -
+
+*/
+fn LDH_A_A8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let addr: u16 = 0xFF00 + get_imm8(cpu) as u16;
+	let new_value = cpu.bus.read_byte(addr);
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: LDH [a8], A
+OPCODES: 0xE0
+DESC: Loads the value stored in a into address 0xFF00+a8
+FLAGS: - - - -
+
+*/
+fn LDH_A8_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let a_value = cpu.registers.get_8bit_reg(Register8Bit::A);
+	let addr: u16 = 0xFF00 + get_imm8(cpu) as u16;
+
+	cpu.bus.write_byte(addr, a_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: LDH A, [C]
+OPCODES: 0xF2
+DESC: Loads the value stored at 0xFF00+C into A
+FLAGS: - - - -
+
+*/
+fn LDH_A_C(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let addr = 0xFF00 + cpu.get_8bit_reg(Register8Bit::C) as u16;
+	let new_value = cpu.bus.read_byte(addr);
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: LDH [C], A
+OPCODES: 0xE2
+DESC: Loads the value stored in A into address 0xFF00+C
+FLAGS: - - - -
+
+*/
+fn LDH_C_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let addr = 0xFF00 + cpu.registers.get_8bit_reg(Register8Bit::C) as u16;
+	let a_value = cpu.registers.get_8bit_reg(Register8Bit::A);
+
+	cpu.bus.write_byte(addr, a_value);
+
+	cpu.pc += 1;
 }
 
 // ! stack instructions
