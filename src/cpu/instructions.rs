@@ -40,6 +40,10 @@ lazy_static!{
 
 		// jump / subroutine instructions
 		Instruction::new(vec![0x20, 0x30, 0x18, 0x28, 0x38], 12, "JR (cond), e8", JR_COND_E8),
+		Instruction::new(vec![0xC3, 0xC2, 0xD2, 0xCA, 0xDA], 16, "JP (cond), a16", JP_COND_A16),
+		Instruction::new(vec![0xE9], 4, "JP HL", JP_HL),
+		Instruction::new(vec![0xC4, 0xD4, 0xCC, 0xDC, 0xCD], 24, "CALL (cond), a16", CALL_COND_A16),
+		Instruction::new(vec![0xC0, 0xD0, 0xC8, 0xD8, 0xC9], 20, "RET (cond)", RET_COND),
 
 		// memory instructions
 		Instruction::new(vec![
@@ -264,6 +268,147 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	} else {
 		cpu.pc += offset_unsigned;
 	}
+
+}
+
+/*
+
+MNEMONIC: JP (cond), a16
+OPCODES: 0xC3, 0x(C-D)2, 0x(C-D)A
+DESC: Jumps to a 16-bit address if cond is true. Takes 16 cycles if cond is true, 12 if not.
+FLAGS: - - - -
+
+*/
+fn JP_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	
+	let jump: bool;
+
+	if (opcode & 1) == 1 {
+		jump = true;
+	} else {
+		let cond = Cond::new((opcode & 0x18) >> 3);
+
+		let z = cpu.registers.get_flag(Flag::Z);
+		let c = cpu.registers.get_flag(Flag::C);
+
+		match cond {
+			Cond::nz => if !z 	{ jump = true; } else { jump = false; },
+			Cond::z => 	if z 	{ jump = true; } else { jump = false; },
+			Cond::nc => if !c 	{ jump = true; } else { jump = false; },
+			Cond::c => 	if c 	{ jump = true; } else { jump = false; }
+		}
+	}
+
+	if !jump {
+		cpu.pc += 1;
+		*cycles = 12;
+		return;
+	}
+
+	let new_addr = get_imm16(cpu);
+	cpu.pc = new_addr;
+
+}
+
+/*
+
+MNEMONIC: JP HL
+OPCODES: 0xE9
+DESC: Jumps to the address stored in HL
+FLAGS: - - - -
+
+*/
+fn JP_HL(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let new_addr = cpu.registers.get_16bit_reg(Register16Bit::HL);
+	cpu.pc = new_addr;
+}
+
+/*
+
+MNEMONIC: Call (cond), a16
+OPCODES: 0x(C-D)4, 0x(C-D)C, 0xCD
+DESC: if the condition is met, push the current address onto the stack and jump to a16
+FLAGS: - - - -
+
+*/
+fn CALL_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let jump: bool;
+
+	if (opcode & 1) == 1 {
+		jump = true;
+	} else {
+		let cond = Cond::new((opcode & 0x18) >> 3);
+
+		let z = cpu.registers.get_flag(Flag::Z);
+		let c = cpu.registers.get_flag(Flag::C);
+
+		match cond {
+			Cond::nz => if !z 	{ jump = true; } else { jump = false; },
+			Cond::z => 	if z 	{ jump = true; } else { jump = false; },
+			Cond::nc => if !c 	{ jump = true; } else { jump = false; },
+			Cond::c => 	if c 	{ jump = true; } else { jump = false; }
+		}
+	}
+
+	if !jump {
+		cpu.pc += 1;
+		*cycles = 12;
+		return;
+	}
+
+	// push current address onto the stack
+	let mut target_addr = cpu.dec_sp();
+	cpu.bus.write_byte(target_addr, (cpu.pc & 0xF) as u8);
+	target_addr = cpu.dec_sp();
+	cpu.bus.write_byte(target_addr, (cpu.pc >> 4) as u8);
+
+	let new_addr = get_imm16(cpu);
+	cpu.pc = new_addr;
+
+}
+
+/*
+
+MNEMONIC: RET (cond)
+OPCODES: 0x(C-D)0, 0x(C-D)8, 0xC9
+DESC: Pops the return address from the stack and puts it in pc
+FLAGS: - - - -
+
+*/
+fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let jump: bool;
+
+	if (opcode & 1) == 1 {
+		jump = true;
+	} else {
+		let cond = Cond::new((opcode & 0x18) >> 3);
+
+		let z = cpu.registers.get_flag(Flag::Z);
+		let c = cpu.registers.get_flag(Flag::C);
+
+		match cond {
+			Cond::nz => if !z 	{ jump = true; } else { jump = false; },
+			Cond::z => 	if z 	{ jump = true; } else { jump = false; },
+			Cond::nc => if !c 	{ jump = true; } else { jump = false; },
+			Cond::c => 	if c 	{ jump = true; } else { jump = false; }
+		}
+	}
+
+	if !jump {
+		cpu.pc += 1;
+		*cycles = 8;
+		return;
+	}
+
+	// pop the return address from the stack
+	let low_byte = cpu.bus.read_byte(cpu.registers.get_16bit_reg(Register16Bit::SP));
+	let sp = cpu.inc_sp();
+	let hi_byte = cpu.bus.read_byte(sp);
+	cpu.inc_sp();
+
+	// set pc to the return address
+	let new_addr = (hi_byte as u16) << 8 | low_byte as u16;
+	cpu.pc = new_addr;
 
 }
 
