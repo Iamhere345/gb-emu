@@ -60,6 +60,8 @@ lazy_static!{
 
 		// stack instructions
 		Instruction::new(vec![0x08], 20, "LD [a16], SP", LD_A16_SP),
+		Instruction::new(vec![0xC5, 0xD5, 0xE5, 0xF5], 16, "PUSH r16", PUSH_R16),
+		Instruction::new(vec![0xC1, 0xD1, 0xE1, 0xF1], 12, "POP r16", POP_R16),
 
 		// arithmetic instructions
 		Instruction::new(vec![0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87], 4, "ADD A, r8", ADD_ADC),
@@ -177,7 +179,7 @@ fn SCF(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 /*
 
 MNEMONIC: DAA
-OPCODES: 0x00
+OPCODES: 0x27
 DESC: For Binary-coded decimal numbers (https://blog.ollien.com/posts/gb-daa/)
 FLAGS: - - - -
 
@@ -380,6 +382,48 @@ fn LD_A_R16MEM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 }
 
 // ! stack instructions
+
+/*
+
+MNEMONIC: PUSH r16stk
+OPCODES: 0x(C-F)5
+DESC: Pushes r16 onto the stack
+FLAGS: - - - -
+
+*/
+fn PUSH_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let target = cpu.registers.get_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3));
+
+	let mut target_addr = cpu.dec_sp();
+	cpu.bus.write_byte(target_addr, (target & 0xF) as u8);
+
+	target_addr = cpu.dec_sp();
+	cpu.bus.write_byte(target_addr, (target >> 4) as u8);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: POP r16
+OPCODES: 0x(C-F)1
+DESC: pops a value off the stack and stores it in r16
+FLAGS: - - - -
+FLAGS (POP AF): Z N H C
+
+*/
+fn POP_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let low_byte = cpu.bus.read_byte(cpu.registers.get_16bit_reg(Register16Bit::SP));
+	let sp = cpu.inc_sp();
+	let hi_byte = cpu.bus.read_byte(sp);
+	cpu.inc_sp();
+
+	let new_value = (hi_byte as u16) << 8 | low_byte as u16;
+	cpu.registers.set_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3), new_value);
+
+	cpu.pc += 1;
+}
 
 /*
 
@@ -748,7 +792,7 @@ fn RLCA_RRCA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 /*
 
 MNEMONIC: RLA, RRA
-OPCODES: 0x00
+OPCODES: 0x17, 0x1F
 DESC: Shifts the A register to the left. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
 FLAGS: 0 0 0 C
 

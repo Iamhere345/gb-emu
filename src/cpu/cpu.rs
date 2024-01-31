@@ -1,6 +1,7 @@
-use crate::cpu::registers::*;
-use crate::cpu::instructions::*;
+use super::registers::*;
+use super::instructions::*;
 use crate::bus::*;
+use super::decode::Interrupt;
 
 pub struct CPU<'a> {
 	pub registers: Registers,
@@ -62,6 +63,10 @@ impl<'a> CPU<'a> {
 
 	}
 	
+	pub fn interrupt(source: Interrupt) {
+
+	}
+
 	pub fn get_deref_hl(&self) -> u8 {
 		self.bus.read_byte(self.registers.get_16bit_reg(Register16Bit::HL))
 	}
@@ -141,5 +146,19 @@ impl<'a> CPU<'a> {
 		self.pc += 1;
 
 		self.pc
+	}
+
+	pub fn inc_sp(&mut self) -> u16 {
+		let old_value = self.registers.get_16bit_reg(Register16Bit::SP);
+		self.registers.set_16bit_reg(Register16Bit::SP, old_value.overflowing_add(1).0);
+
+		old_value.overflowing_add(1).0
+	}
+
+	pub fn dec_sp(&mut self) -> u16 {
+		let old_value = self.registers.get_16bit_reg(Register16Bit::SP);
+		self.registers.set_16bit_reg(Register16Bit::SP, old_value.overflowing_sub(1).0);
+
+		old_value.overflowing_sub(1).0
 	}
 }
