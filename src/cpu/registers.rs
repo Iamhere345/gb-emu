@@ -183,6 +183,15 @@ impl Register16Bit {
 			_ => panic!("Invalid r16mem")
 		}
 	}
+	pub fn from_r16stk(r16stk: u8) -> Self {
+		match r16stk {
+			0 => Self::BC,
+			1 => Self::DE,
+			2 => Self::HL,
+			3 => Self::AF,
+			_ => panic!("Invalid r16stk")
+		}
+	}
 }
 
 impl Register8Bit {
