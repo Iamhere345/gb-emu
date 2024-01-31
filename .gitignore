@@ -1,3 +1,5 @@
 /target
 .bak
 /tests/cpu_instrs/source
+emu.log
+gameboy-doctor/

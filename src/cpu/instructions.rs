@@ -269,7 +269,7 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		return;
 	}
 
-	let offset: i8 = get_imm8(cpu) as i8;
+	let offset: i8 = get_imm8(cpu) as i8 + 1;
 
 	let offset_unsigned: u16 = offset.abs().try_into().unwrap();
 
@@ -480,7 +480,7 @@ FLAGS: - - - -
 
 */
 fn LD_R8_IMM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
-	let dest = Register8Bit::from_r8(opcode >> 4);
+	let dest = Register8Bit::from_r8(opcode >> 3);
 
 	cpu.pc += 1;
 	let src = cpu.bus.read_byte(cpu.pc);

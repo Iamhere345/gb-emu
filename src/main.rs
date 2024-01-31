@@ -2,7 +2,7 @@ use bus::*;
 use cpu::cpu::CPU;
 use cpu::registers::*;
 
-use std::io::prelude::*;
+use std::io::{prelude::*, BufWriter};
 use std::fs::File;
 
 mod cpu;
@@ -19,9 +19,10 @@ fn main() {
 		cpu.bus.write_byte(addr.try_into().unwrap(), *byte);
 	}
 
-	let mut log = File::create("../emu.log").expect("unable to open log file");
+	let log = File::create("emu.log").expect("unable to open log file");
+	let mut log_writer = BufWriter::new(&log);
 
-	cpu.pc = 0x100;
+	cpu.pc = 0xFF;
 
 	loop {
 		let result = cpu.cycle();
@@ -41,7 +42,7 @@ fn main() {
 		let pc2 = cpu.bus.read_byte(cpu.pc + 2);
 		let pc3 = cpu.bus.read_byte(cpu.pc + 3);
 
-		write!(&mut log, "A:{:x} F:{:x} B:{:x} C:{:x} D:{:x} E:{:x} H:{:x} L:{:x} SP:{:x} PC:{:x} PCMEM:{:x},{:x},{:x},{:x}\n", a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3).expect("E");
+		write!(&mut log_writer, "A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n", a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3).expect("E");
 
 		if result == 1 {
 			break;
