@@ -73,6 +73,9 @@ lazy_static!{
 		Instruction::new(vec![0x08], 20, "LD [a16], SP", LD_A16_SP),
 		Instruction::new(vec![0xC5, 0xD5, 0xE5, 0xF5], 16, "PUSH r16", PUSH_R16),
 		Instruction::new(vec![0xC1, 0xD1, 0xE1, 0xF1], 12, "POP r16", POP_R16),
+		Instruction::new(vec![0xF9], 8, "LD SP, HL", LD_SP_HL),
+		Instruction::new(vec![0xF8], 12, "LD HL, SP + e8", LD_HL_SP_E8),
+		Instruction::new(vec![0xE8], 16, "ADD SP, e8", ADD_SP_E8),
 
 		// arithmetic instructions
 		Instruction::new(vec![0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87], 4, "ADD A, r8", ADD_ADC),
@@ -676,6 +679,64 @@ fn POP_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let new_value = (hi_byte as u16) << 8 | low_byte as u16;
 	cpu.registers.set_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3), new_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: LD SP, HL
+OPCODES: 0xF9
+DESC: Loads the value stored in HL into SP
+FLAGS: - - - -
+
+*/
+fn LD_SP_HL(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let hl_value = cpu.registers.get_16bit_reg(Register16Bit::HL);
+	cpu.registers.set_16bit_reg(Register16Bit::SP, hl_value);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: LD HL, SP + e8
+OPCODES: 0xF8
+DESC: Sets HL to SP + e8
+FLAGS: 0 0 H C
+
+*/
+fn LD_HL_SP_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let sp_value = cpu.registers.get_16bit_reg(Register16Bit::SP);
+	let offset: i8 = get_imm8(cpu) as i8;
+
+	cpu.registers.set_16bit_reg(Register16Bit::HL, ((cpu.registers.get_16bit_reg(Register16Bit::SP) as i16) + offset as i16) as u16);
+
+	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::H, (sp_value & 0xF) + (offset as u16 & 0xF) > 0xF);
+	cpu.registers.set_flag(Flag::C, (sp_value & 0xFF) + (offset as u16 & 0xFF) > 0xFF);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: ADD SP, e8
+OPCODES: 0xE8
+DESC: Offsets SP by e8
+FLAGS: 0 0 H C
+
+*/
+fn ADD_SP_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	
+	let offset = get_imm8(cpu) as i8;
+
+	let sp_value = cpu.registers.get_16bit_reg(Register16Bit::SP);
+	cpu.registers.set_16bit_reg(Register16Bit::SP, (sp_value as i16 + offset as i16) as u16);
+
+	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::H, (sp_value & 0xF) + (offset as u16 & 0xF) > 0xF);
+	cpu.registers.set_flag(Flag::C, (sp_value & 0xFF) + (offset as u16 & 0xFF) > 0xFF);
 
 	cpu.pc += 1;
 }
