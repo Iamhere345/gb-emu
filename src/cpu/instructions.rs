@@ -38,12 +38,18 @@ lazy_static!{
 		Instruction::new(vec![0x37], 4, "SCF", SCF),
 		Instruction::new(vec![0x27], 4, "DAA", DAA),
 
+		Instruction::new(vec![0xFB], 4, "EI", EI),
+		Instruction::new(vec![0xF4], 4, "DI", DI),
+
 		// jump / subroutine instructions
 		Instruction::new(vec![0x20, 0x30, 0x18, 0x28, 0x38], 12, "JR (cond), e8", JR_COND_E8),
 		Instruction::new(vec![0xC3, 0xC2, 0xD2, 0xCA, 0xDA], 16, "JP (cond), a16", JP_COND_A16),
 		Instruction::new(vec![0xE9], 4, "JP HL", JP_HL),
 		Instruction::new(vec![0xC4, 0xD4, 0xCC, 0xDC, 0xCD], 24, "CALL (cond), a16", CALL_COND_A16),
-		Instruction::new(vec![0xC0, 0xD0, 0xC8, 0xD8, 0xC9], 20, "RET (cond)", RET_COND),
+		
+		Instruction::new(vec![0xC0, 0xD0, 0xC8, 0xD8], 20, "RET (cond)", RET_COND),
+		Instruction::new(vec![0xC9], 16, "RET", RET_COND),
+		Instruction::new(vec![0xD9], 16, "RETI", RET_COND),
 
 		// memory instructions
 		Instruction::new(vec![
@@ -132,6 +138,35 @@ FLAGS: - - - -
 
 */
 fn NOP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: EI
+OPCODES: 0xFB
+DESC: enables interrupt handling (IME = 1)
+FLAGS: - - - -
+
+*/
+fn EI(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	// ? accuracy: the effects of EI are delayed by one instruction (important for the halt bug)
+	cpu.ime = true;
+	
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: DI
+OPCODES: 0xF4
+DESC: disables interrupt handling (IME = 0)
+FLAGS: - - - -
+
+*/
+fn DI(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	cpu.ime = false;
+
 	cpu.pc += 1;
 }
 
@@ -231,6 +266,7 @@ fn DAA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.pc += 1;
 }
+
 
 
 // ! jump / subroutine instructions
@@ -379,9 +415,10 @@ fn CALL_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 /*
 
-MNEMONIC: RET (cond)
-OPCODES: 0x(C-D)0, 0x(C-D)8, 0xC9
-DESC: Pops the return address from the stack and puts it in pc
+MNEMONIC: RET (cond) / RETI
+OPCODES: 0x(C-D)0, 0x(C-D)8, 0xC9, 0xD9
+DESC: Pops the return address from the stack and puts it in pc. If the instruction is RETI
+it will set IME first
 FLAGS: - - - -
 
 */
@@ -390,6 +427,10 @@ fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	if (opcode & 1) == 1 {
 		jump = true;
+		// RETI
+	} else if opcode == 0xD9 {
+		jump = true;
+		cpu.ime = true;
 	} else {
 		let cond = Cond::new((opcode & 0x18) >> 3);
 

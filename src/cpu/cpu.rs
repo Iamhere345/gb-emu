@@ -6,6 +6,7 @@ use super::decode::Interrupt;
 pub struct CPU<'a> {
 	pub registers: Registers,
 	pub pc: u16,
+	pub ime: bool,	// interrupt master enable
 	pub bus: &'a mut Bus,
 }
 
@@ -16,6 +17,7 @@ impl<'a> CPU<'a> {
 		CPU {
 			registers: Registers::new(),
 			pc: 0,
+			ime: false,
 			bus: bus,
 		}
 	}
