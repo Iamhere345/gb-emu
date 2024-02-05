@@ -33,13 +33,23 @@ const HRAM_END:				u16	= 0xFFFE;
 const IE_START:				u16	= 0xFFFE;
 const IE_END:				u16	= 0xFFFF;
 
+pub enum MemRegister {
+	IE = 0xFFFF,		// interrupt enable
+	IF = 0xFF0F,		// interrupt flag
+
+	// TODO add other registers as they as needed
+}
+
 #[allow(dead_code)]
 pub struct Bus {
 	// devices on the bus
 	// TODO rom bank switching
 	// these are probably just going to be placeholders until the i write actual devices populate the bus
 
-	memory: [u8; 0xFFFF]
+	memory: [u8; 0xFFFF],
+
+	wram: [u8; (WRAM_END - WRAM_START) as usize],
+	hram: [u8; (HRAM_END - HRAM_START) as usize],
 
 	/*
 	rom_bank1: 		[u8; ROM_BANK1_END],							// fixed ROM bank from the cart
@@ -60,15 +70,27 @@ impl Bus {
 	pub fn new() -> Self {
 
 		Bus {
-			memory: [0; 0xFFFF]
+			memory: [0; 0xFFFF],
+
+			wram: [0; (WRAM_END - WRAM_START) as usize],
+			hram: [0; (HRAM_END - HRAM_START) as usize],
 		}
 
 	}
 
 	pub fn read_byte(&self, addr: u16) -> u8 {
 
+		// TODO replace with cart memory
 		if addr >= ROM_BANK1_START && addr <= ROM_BANK2_END {
 			return self.memory[addr as usize];
+		}
+
+		if addr >= WRAM_START && addr <= WRAM_END {
+			return self.wram[(addr - WRAM_START) as usize];
+		}
+
+		if addr >= HRAM_START && addr <= HRAM_END {
+			return self.hram[(addr - HRAM_START) as usize];
 		}
 
 		// gameboy doctor
@@ -80,15 +102,28 @@ impl Bus {
 
 	}
 
-	pub fn write_byte(&mut self, addr: u16, write: u8) -> bool {
+	pub fn write_byte(&mut self, addr: u16, write: u8) {
 
-		if addr >= ROM_BANK1_START && addr < ROM_BANK2_END {
+		if addr >= ROM_BANK1_START && addr <= ROM_BANK2_END {
 			self.memory[addr as usize] = write;
-			return true;
 		}
 
-		false
+		if addr >= WRAM_START && addr <= WRAM_END {
+			self.wram[(addr - WRAM_START) as usize] = write;
+		}
 
+		if addr >= HRAM_START && addr <= HRAM_END {
+			self.hram[(addr - HRAM_START) as usize] = write;
+		}
+
+	}
+
+	pub fn read_register(&mut self, register: MemRegister) -> u8 {
+		self.read_byte(register as u16)
+	}
+
+	pub fn write_register(&mut self, register: MemRegister, write: u8) {
+		self.write_byte(register as u16, write)
 	}
 
 }
