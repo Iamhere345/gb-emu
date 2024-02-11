@@ -11,14 +11,6 @@ pub enum Cond {
 	c,
 }
 
-pub enum Interrupt {
-	VBLANK,
-	LCDC,
-	SERIAL,
-	TIMER,
-	HiToLo
-}
-
 impl Cond {
 	pub fn new(num: u8) -> Self {
 		match num {

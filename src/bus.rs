@@ -40,6 +40,49 @@ pub enum MemRegister {
 	// TODO add other registers as they as needed
 }
 
+
+// used for setting bits in IE and IF
+pub enum InterruptFlag {
+	VBlank = 1 << 0,
+	LCDC = 1 << 1,
+	Timer = 1 << 2,
+	Serial = 1 << 3,
+	Joypad = 1 << 4,
+}
+
+impl InterruptFlag {
+	pub fn from_u8(from: u8) -> Self {
+		match from {
+			1 => Self::VBlank,
+			2 => Self::LCDC,
+			4 => Self::Timer,
+			8 => Self::Serial,
+			16 => Self::Joypad,
+			_ => panic!("invalid interrupt flag")
+		}
+	}
+}
+
+pub enum InterruptSource {
+	VBlank = 0x40,
+	LCDC = 0x48,
+	Timer = 0x50,
+	Serial = 0x58,
+	Joypad = 0x60
+}
+
+impl InterruptSource {
+	pub fn from_flag(from: InterruptFlag) -> Self {
+		match from {
+			InterruptFlag::VBlank => Self::VBlank,
+			InterruptFlag::LCDC => Self::LCDC,
+			InterruptFlag::Timer => Self::Timer,
+			InterruptFlag::Serial => Self::Serial,
+			InterruptFlag::Joypad => Self::Joypad
+		}
+	}
+}
+
 #[allow(dead_code)]
 pub struct Bus {
 	// devices on the bus
@@ -118,7 +161,7 @@ impl Bus {
 
 	}
 
-	pub fn read_register(&mut self, register: MemRegister) -> u8 {
+	pub fn read_register(&self, register: MemRegister) -> u8 {
 		self.read_byte(register as u16)
 	}
 

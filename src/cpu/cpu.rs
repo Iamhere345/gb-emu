@@ -1,7 +1,6 @@
 use super::registers::*;
 use super::instructions::*;
 use crate::bus::*;
-use super::decode::Interrupt;
 
 pub struct CPU<'a> {
 	pub registers: Registers,
@@ -22,7 +21,7 @@ impl<'a> CPU<'a> {
 		}
 	}
 
-	pub fn cycle(&mut self) -> u8 {
+	pub fn cycle(&mut self) -> bool {
 
 		// TODO check if the amount of cycles for an instruction includes fetching the byte after a prefix and immediates (i think it does)
 
@@ -43,6 +42,8 @@ impl<'a> CPU<'a> {
 			prefixed = false;
 		}
 
+		let mut executed: bool = false;
+
 		for instruction in if prefixed { PREFIXED_INSTRUCTIONS.iter() } else { INSTRUCTIONS.iter() } {
 			for opcode in instruction.opcodes.iter() {
 				if byte == *opcode {
@@ -54,19 +55,68 @@ impl<'a> CPU<'a> {
 					(instruction.exec)(self, byte, &mut cycles);
 
 					// TODO wait clock_speed * cycles after the instruction has been executed
-					return 0;
+					executed = true;
 				}
 			}
 		}
 
-		println!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
-		return 1;
+		if !executed {
+			println!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
+		}
+
+		// check for interrupts
+		if self.ime {
+			let if_flags = self.bus.read_register(MemRegister::IF);
+			let ie_flags = self.bus.read_register(MemRegister::IE);
+
+			for i in 0..4 {
+
+				if ((if_flags >> i) & 1) == 1 && ((ie_flags >> i) & 1) == 1 {
+					let flag: InterruptFlag = InterruptFlag::from_u8(((if_flags >> i) & 1) << i);
+					
+					self.interrupt(flag, InterruptSource::from_flag(flag));
+				}
+
+			}
+		}
+
+		return executed;
 		
 
 	}
 	
-	pub fn interrupt(source: Interrupt) {
+	pub fn interrupt(&mut self, flag: InterruptFlag, source: InterruptSource) {
 
+		// assumes the corresponding IE bit is true
+		// interrupts are checked before the next instruction is executed
+
+		let new_if = self.bus.read_register(MemRegister::IF) & flag as u8;
+		self.bus.write_register(MemRegister::IF, new_if);
+
+		self.ime = false;
+
+		self.push16(self.pc);
+		self.pc = source as u16
+
+		// TODO lasts 25 T-states (cycles)
+
+	}
+
+	pub fn push16(&mut self, to_push: u16) {
+		let mut target_addr = self.dec_sp();
+		self.bus.write_byte(target_addr, (to_push & 0xF) as u8);
+
+		target_addr = self.dec_sp();
+		self.bus.write_byte(target_addr, (to_push >> 4) as u8);
+	}
+
+	pub fn pop16(&mut self) -> u16 {
+		let low_byte = self.bus.read_byte(self.registers.get_16bit_reg(Register16Bit::SP));
+		let sp = self.inc_sp();
+		let hi_byte = self.bus.read_byte(sp);
+		self.inc_sp();
+
+		(hi_byte as u16) << 8 | low_byte as u16
 	}
 
 	pub fn get_deref_hl(&self) -> u8 {
