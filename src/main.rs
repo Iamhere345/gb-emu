@@ -4,6 +4,8 @@ use cpu::registers::*;
 
 use std::io::{prelude::*, BufWriter};
 use std::fs::File;
+use std::thread::sleep;
+use std::time::Duration;
 
 mod cpu;
 mod bus;
