@@ -80,6 +80,8 @@ impl<'a> CPU<'a> {
 					let flag: InterruptFlag = InterruptFlag::from_u8(((if_flags >> i) & 1) << i);
 					
 					self.interrupt(flag, InterruptSource::from_flag(flag));
+
+					break;
 				}
 
 			}
