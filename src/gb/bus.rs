@@ -1,3 +1,5 @@
+use super::cpu::CPU;
+
 // possible off-by-one error
 const ROM_BANK1_START: 		u16	= 0x0;
 const ROM_BANK1_END: 		u16	= 0x3FFF;
@@ -42,6 +44,7 @@ pub enum MemRegister {
 
 
 // used for setting bits in IE and IF
+#[derive(Copy, Clone)]
 pub enum InterruptFlag {
 	VBlank = 1 << 0,
 	LCDC = 1 << 1,

@@ -4,9 +4,43 @@ use std::vec;
 
 use lazy_static::lazy_static;
 
-use super::cpu::CPU;
+use super::CPU;
 use super::registers::*;
-use super::decode::*;
+
+#[allow(non_camel_case_types)]
+pub enum Cond {
+	nz,
+	z,
+	nc,
+	c,
+}
+
+impl Cond {
+	pub fn new(num: u8) -> Self {
+		match num {
+			0 => Self::nz,
+			1 => Self::z,
+			2 => Self::nc,
+			3 => Self::c,
+			_ => panic!("invalid condition flag")
+		}
+	}
+}
+
+pub fn get_imm8(cpu: &mut CPU) -> u8 {
+	cpu.pc += 1;
+	cpu.bus.borrow().read_byte(cpu.pc)
+}
+
+pub fn get_imm16(cpu: &mut CPU) -> u16 {
+	cpu.pc += 1;
+	let lo_byte = cpu.bus.borrow().read_byte(cpu.pc);
+
+	cpu.pc += 1;
+	let hi_byte = cpu.bus.borrow().read_byte(cpu.pc);
+
+	((hi_byte as u16) << 8) | lo_byte as u16
+}
 
 pub struct Instruction {
 	pub opcodes: Vec<u8>,
@@ -404,9 +438,9 @@ fn CALL_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	// push current address onto the stack
 	let mut target_addr = cpu.dec_sp();
-	cpu.bus.write_byte(target_addr, (cpu.pc & 0xF) as u8);
+	cpu.bus.borrow_mut().write_byte(target_addr, (cpu.pc & 0xF) as u8);
 	target_addr = cpu.dec_sp();
-	cpu.bus.write_byte(target_addr, (cpu.pc >> 4) as u8);
+	cpu.bus.borrow_mut().write_byte(target_addr, (cpu.pc >> 4) as u8);
 
 	let new_addr = get_imm16(cpu);
 	cpu.pc = new_addr;
@@ -452,9 +486,9 @@ fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	// pop the return address from the stack
-	let low_byte = cpu.bus.read_byte(cpu.registers.get_16bit_reg(Register16Bit::SP));
+	let low_byte = cpu.bus.borrow().read_byte(cpu.registers.get_16bit_reg(Register16Bit::SP));
 	let sp = cpu.inc_sp();
-	let hi_byte = cpu.bus.read_byte(sp);
+	let hi_byte = cpu.bus.borrow().read_byte(sp);
 	cpu.inc_sp();
 
 	// set pc to the return address
@@ -499,10 +533,10 @@ fn LD_R16_IMM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let dest = Register16Bit::from_r16(opcode >> 4);
 
 	cpu.pc += 1;
-	let lo_src = cpu.bus.read_byte(cpu.pc);
+	let lo_src = cpu.bus.borrow().read_byte(cpu.pc);
 
 	cpu.pc += 1;
-	let hi_src = cpu.bus.read_byte(cpu.pc);
+	let hi_src = cpu.bus.borrow().read_byte(cpu.pc);
 
 	let src: u16 = ((hi_src as u16) << 8) | lo_src as u16;
 
@@ -524,7 +558,7 @@ fn LD_R8_IMM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let dest = Register8Bit::from_r8(opcode >> 3);
 
 	cpu.pc += 1;
-	let src = cpu.bus.read_byte(cpu.pc);
+	let src = cpu.bus.borrow().read_byte(cpu.pc);
 
 	cpu.set_8bit_reg(dest, src);
 
@@ -545,7 +579,7 @@ fn LD_R16MEM_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let dest_info = Register16Bit::from_r16mem(opcode >> 4);
 	let dest = cpu.registers.get_16bit_reg(dest_info.0);
 
-	cpu.bus.write_byte(dest, cpu.registers.get_8bit_reg(Register8Bit::A));
+	cpu.bus.borrow_mut().write_byte(dest, cpu.registers.get_8bit_reg(Register8Bit::A));
 
 	// postinc or postdec
 	cpu.registers.set_16bit_reg(dest_info.0, (dest as i16 + dest_info.1 as i16) as u16);
@@ -568,7 +602,7 @@ fn LD_A_R16MEM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let src_info = Register16Bit::from_r16mem(opcode >> 4);
 	let src = cpu.registers.get_16bit_reg(src_info.0);
 
-	cpu.set_8bit_reg(Register8Bit::A, cpu.bus.read_byte(src));
+	cpu.set_8bit_reg(Register8Bit::A, cpu.bus.borrow().read_byte(src));
 
 	// postinc or postdec
 	cpu.registers.set_16bit_reg(src_info.0, (src as i16 + src_info.1 as i16) as u16);
@@ -587,7 +621,7 @@ FLAGS: - - - -
 */
 fn LD_A_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let addr = get_imm16(cpu);
-	let new_value = cpu.bus.read_byte(addr);
+	let new_value = cpu.bus.borrow().read_byte(addr);
 
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
 
@@ -606,7 +640,7 @@ fn LD_A16_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let addr = get_imm16(cpu);
 	let a_value = cpu.registers.get_8bit_reg(Register8Bit::A);
 
-	cpu.bus.write_byte(addr, a_value);
+	cpu.bus.borrow_mut().write_byte(addr, a_value);
 
 	cpu.pc += 1;
 }
@@ -622,7 +656,7 @@ FLAGS: - - - -
 fn LDH_A_A8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let addr: u16 = 0xFF00 + get_imm8(cpu) as u16;
-	let new_value = cpu.bus.read_byte(addr);
+	let new_value = cpu.bus.borrow().read_byte(addr);
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
 
 	cpu.pc += 1;
@@ -641,7 +675,7 @@ fn LDH_A8_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let a_value = cpu.registers.get_8bit_reg(Register8Bit::A);
 	let addr: u16 = 0xFF00 + get_imm8(cpu) as u16;
 
-	cpu.bus.write_byte(addr, a_value);
+	cpu.bus.borrow_mut().write_byte(addr, a_value);
 
 	cpu.pc += 1;
 }
@@ -656,7 +690,7 @@ FLAGS: - - - -
 */
 fn LDH_A_C(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let addr = 0xFF00 + cpu.get_8bit_reg(Register8Bit::C) as u16;
-	let new_value = cpu.bus.read_byte(addr);
+	let new_value = cpu.bus.borrow().read_byte(addr);
 
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
 
@@ -675,7 +709,7 @@ fn LDH_C_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let addr = 0xFF00 + cpu.registers.get_8bit_reg(Register8Bit::C) as u16;
 	let a_value = cpu.registers.get_8bit_reg(Register8Bit::A);
 
-	cpu.bus.write_byte(addr, a_value);
+	cpu.bus.borrow_mut().write_byte(addr, a_value);
 
 	cpu.pc += 1;
 }
@@ -694,10 +728,10 @@ fn PUSH_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let target = cpu.registers.get_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3));
 
 	let mut target_addr = cpu.dec_sp();
-	cpu.bus.write_byte(target_addr, (target & 0xF) as u8);
+	cpu.bus.borrow_mut().write_byte(target_addr, (target & 0xF) as u8);
 
 	target_addr = cpu.dec_sp();
-	cpu.bus.write_byte(target_addr, (target >> 4) as u8);
+	cpu.bus.borrow_mut().write_byte(target_addr, (target >> 4) as u8);
 
 	cpu.pc += 1;
 }
@@ -713,9 +747,9 @@ FLAGS (POP AF): Z N H C
 */
 fn POP_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
-	let low_byte = cpu.bus.read_byte(cpu.registers.get_16bit_reg(Register16Bit::SP));
+	let low_byte = cpu.bus.borrow().read_byte(cpu.registers.get_16bit_reg(Register16Bit::SP));
 	let sp = cpu.inc_sp();
-	let hi_byte = cpu.bus.read_byte(sp);
+	let hi_byte = cpu.bus.borrow().read_byte(sp);
 	cpu.inc_sp();
 
 	let new_value = (hi_byte as u16) << 8 | low_byte as u16;
@@ -792,16 +826,16 @@ FLAGS: - - - -
 */
 fn LD_A16_SP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.pc += 1;
-	let lo_addr = cpu.bus.read_byte(cpu.pc);
+	let lo_addr = cpu.bus.borrow().read_byte(cpu.pc);
 
 	cpu.pc += 1;
-	let hi_addr = cpu.bus.read_byte(cpu.pc);
+	let hi_addr = cpu.bus.borrow().read_byte(cpu.pc);
 
 	let addr: u16 = ((hi_addr as u16) << 8) | lo_addr as u16;
 
 	let sp = cpu.registers.get_16bit_reg(Register16Bit::SP);
-	cpu.bus.write_byte(addr, (sp & 0xFF) as u8);
-	cpu.bus.write_byte(addr + 1, (sp >> 8) as u8);
+	cpu.bus.borrow_mut().write_byte(addr, (sp & 0xFF) as u8);
+	cpu.bus.borrow_mut().write_byte(addr + 1, (sp >> 8) as u8);
 
 	cpu.pc += 1;
 

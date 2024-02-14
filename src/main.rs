@@ -1,17 +1,21 @@
-use bus::*;
-use cpu::cpu::CPU;
-use cpu::registers::*;
+use gb::bus::*;
+use gb::cpu::CPU;
+use gb::cpu::registers::*;
+use gb::Gameboy;
 
 use std::io::{prelude::*, BufWriter};
 use std::fs::File;
 use std::thread::sleep;
 use std::time::Duration;
+use std::cell::RefCell;
 
-mod cpu;
-mod bus;
+mod gb;
 
 fn main() {
     
+	
+
+	/*
 	let bytes = include_bytes!("../tests/cpu_instrs/individual/06-ld r,r.gb");
 
 	let mut bus: Bus = Bus::new();
@@ -46,9 +50,11 @@ fn main() {
 
 		write!(&mut log_writer, "A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n", a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3).expect("E");
 
-		if result == 1 {
+		if result == true {
 			break;
 		}
 	}
+	*/
+	
 
 }
