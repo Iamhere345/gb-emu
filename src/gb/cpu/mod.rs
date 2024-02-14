@@ -1,18 +1,23 @@
-use super::registers::*;
-use super::instructions::*;
-use crate::bus::*;
+pub mod registers;
+mod instructions;
+
+use crate::gb::bus::*;
+use self::registers::*;
+use self::instructions::*;
+
+use std::cell::RefCell;
 
 pub struct CPU<'a> {
 	pub registers: Registers,
 	pub pc: u16,
 	pub ime: bool,	// interrupt master enable
-	pub bus: &'a mut Bus,
+	pub bus: &'a RefCell<Bus>,
 }
 
 #[allow(dead_code)]
 impl<'a> CPU<'a> {
 
-	pub fn new(bus: &'a mut Bus) -> Self {
+	pub fn new(bus: &'a RefCell<Bus>) -> Self {
 		CPU {
 			registers: Registers::new(),
 			pc: 0,
@@ -25,7 +30,7 @@ impl<'a> CPU<'a> {
 
 		// TODO check if the amount of cycles for an instruction includes fetching the byte after a prefix and immediates (i think it does)
 
-		let mut byte: u8 = self.bus.read_byte(self.pc);
+		let mut byte: u8 = self.bus.borrow().read_byte(self.pc);
 		let prefixed: bool;
 
 		if byte == 0xCB {
@@ -36,7 +41,7 @@ impl<'a> CPU<'a> {
 			prefixed = true;
 
 			self.pc += 1;
-			byte = self.bus.read_byte(self.pc);
+			byte = self.bus.borrow().read_byte(self.pc);
 
 		} else {
 			prefixed = false;
@@ -66,8 +71,8 @@ impl<'a> CPU<'a> {
 
 		// check for interrupts
 		if self.ime {
-			let if_flags = self.bus.read_register(MemRegister::IF);
-			let ie_flags = self.bus.read_register(MemRegister::IE);
+			let if_flags = self.bus.borrow().read_register(MemRegister::IF);
+			let ie_flags = self.bus.borrow().read_register(MemRegister::IE);
 
 			for i in 0..4 {
 
@@ -90,8 +95,8 @@ impl<'a> CPU<'a> {
 		// assumes the corresponding IE bit is true
 		// interrupts are checked before the next instruction is executed
 
-		let new_if = self.bus.read_register(MemRegister::IF) & flag as u8;
-		self.bus.write_register(MemRegister::IF, new_if);
+		let new_if = self.bus.borrow().read_register(MemRegister::IF) & flag as u8;
+		self.bus.borrow_mut().write_register(MemRegister::IF, new_if);
 
 		self.ime = false;
 
@@ -104,27 +109,27 @@ impl<'a> CPU<'a> {
 
 	pub fn push16(&mut self, to_push: u16) {
 		let mut target_addr = self.dec_sp();
-		self.bus.write_byte(target_addr, (to_push & 0xF) as u8);
+		self.bus.borrow_mut().write_byte(target_addr, (to_push & 0xF) as u8);
 
 		target_addr = self.dec_sp();
-		self.bus.write_byte(target_addr, (to_push >> 4) as u8);
+		self.bus.borrow_mut().write_byte(target_addr, (to_push >> 4) as u8);
 	}
 
 	pub fn pop16(&mut self) -> u16 {
-		let low_byte = self.bus.read_byte(self.registers.get_16bit_reg(Register16Bit::SP));
+		let low_byte = self.bus.borrow().read_byte(self.registers.get_16bit_reg(Register16Bit::SP));
 		let sp = self.inc_sp();
-		let hi_byte = self.bus.read_byte(sp);
+		let hi_byte = self.bus.borrow().read_byte(sp);
 		self.inc_sp();
 
 		(hi_byte as u16) << 8 | low_byte as u16
 	}
 
 	pub fn get_deref_hl(&self) -> u8 {
-		self.bus.read_byte(self.registers.get_16bit_reg(Register16Bit::HL))
+		self.bus.borrow().read_byte(self.registers.get_16bit_reg(Register16Bit::HL))
 	}
 
 	pub fn set_deref_hl(&mut self, write: u8) {
-		self.bus.write_byte(self.registers.get_16bit_reg(Register16Bit::HL), write);
+		self.bus.borrow_mut().write_byte(self.registers.get_16bit_reg(Register16Bit::HL), write);
 	}
 
 	/*
