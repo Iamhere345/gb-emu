@@ -602,7 +602,9 @@ fn LD_A_R16MEM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let src_info = Register16Bit::from_r16mem(opcode >> 4);
 	let src = cpu.registers.get_16bit_reg(src_info.0);
 
-	cpu.set_8bit_reg(Register8Bit::A, cpu.bus.borrow().read_byte(src));
+	let new_a = cpu.bus.borrow().read_byte(src);
+
+	cpu.set_8bit_reg(Register8Bit::A, new_a);
 
 	// postinc or postdec
 	cpu.registers.set_16bit_reg(src_info.0, (src as i16 + src_info.1 as i16) as u16);

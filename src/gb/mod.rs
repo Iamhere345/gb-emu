@@ -2,31 +2,27 @@ use cpu::CPU;
 use bus::Bus;
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 pub mod cpu;
 pub mod bus;
 
-pub struct Gameboy<'a> {
-	cpu: CPU<'a>,
-	cpu2: CPU<'a>,
-	bus: RefCell<Bus>,
+pub struct Gameboy {
+	cpu: CPU,
+	bus: Rc<RefCell<Bus>>,
 	pub cycles: u64,
 }
 
-impl<'a> Gameboy<'a> {
+impl Gameboy {
 
 	
-	pub fn new() -> Gameboy<'a> {
+	pub fn new() -> Gameboy {
 
-		// TODO use RefCell<T> for pointers to the bus?
-		// AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-		// i fucking hate lifetimes
-		let bus = RefCell::new(Bus::new());
+		let bus = Rc::new(RefCell::new(Bus::new()));
 
 		Gameboy {
-			bus: bus,
-			cpu: CPU::new(&bus),
-			cpu2: CPU::new(&bus),
+			bus: Rc::clone(&bus),
+			cpu: CPU::new(Rc::clone(&bus)),
 			cycles: 0
 		}
 

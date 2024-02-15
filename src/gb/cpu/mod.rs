@@ -6,18 +6,19 @@ use self::registers::*;
 use self::instructions::*;
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
-pub struct CPU<'a> {
+pub struct CPU {
 	pub registers: Registers,
 	pub pc: u16,
 	pub ime: bool,	// interrupt master enable
-	pub bus: &'a RefCell<Bus>,
+	pub bus: Rc<RefCell<Bus>>,
 }
 
 #[allow(dead_code)]
-impl<'a> CPU<'a> {
+impl CPU {
 
-	pub fn new(bus: &'a RefCell<Bus>) -> Self {
+	pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
 		CPU {
 			registers: Registers::new(),
 			pc: 0,
