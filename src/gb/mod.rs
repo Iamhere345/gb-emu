@@ -71,4 +71,10 @@ impl Gameboy {
 
 	}
 
+	pub fn tick(delta_time: u64) {
+
+		
+
+	}
+
 }
