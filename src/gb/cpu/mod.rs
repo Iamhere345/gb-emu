@@ -10,9 +10,11 @@ use std::rc::Rc;
 
 pub struct CPU {
 	pub registers: Registers,
-	pub pc: u16,
-	pub ime: bool,	// interrupt master enable
 	pub bus: Rc<RefCell<Bus>>,
+	pub pc: u16,
+	pub ime: bool,			// interrupt master enable
+	pub halted: bool,		// used with the HALT instruction
+	pub wait_cycles: u16,	// used to count the number of cycles left until an instruction has finished
 }
 
 #[allow(dead_code)]
@@ -21,9 +23,11 @@ impl CPU {
 	pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
 		CPU {
 			registers: Registers::new(),
+			bus: bus,
 			pc: 0,
 			ime: false,
-			bus: bus,
+			halted: false,
+			wait_cycles: 0,
 		}
 	}
 
@@ -50,18 +54,20 @@ impl CPU {
 
 		let mut executed: bool = false;
 
-		for instruction in if prefixed { PREFIXED_INSTRUCTIONS.iter() } else { INSTRUCTIONS.iter() } {
-			for opcode in instruction.opcodes.iter() {
-				if byte == *opcode {
+		if !self.halted {
+			for instruction in if prefixed { PREFIXED_INSTRUCTIONS.iter() } else { INSTRUCTIONS.iter() } {
+				for opcode in instruction.opcodes.iter() {
+					if byte == *opcode {
 
-					println!("[0x{:x}] {}", self.pc, instruction.mnemonic);
+						println!("[0x{:x}] {}", self.pc, instruction.mnemonic);
 
-					let mut cycles = instruction.cycles;
+						let mut cycles = instruction.cycles;
 
-					(instruction.exec)(self, byte, &mut cycles);
+						(instruction.exec)(self, byte, &mut cycles);
 
-					// TODO wait clock_speed * cycles after the instruction has been executed
-					executed = true;
+						self.wait_cycles = cycles;
+						executed = true;
+					}
 				}
 			}
 		}
@@ -69,7 +75,7 @@ impl CPU {
 		if !executed {
 			println!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
 		}
-
+		
 		// check for interrupts
 		if self.ime {
 			let if_flags = self.bus.borrow().read_register(MemRegister::IF);
@@ -98,15 +104,17 @@ impl CPU {
 		// assumes the corresponding IE bit is true
 		// interrupts are checked before the next instruction is executed
 
+		if self.halted { self.halted = false; }
+
 		let new_if = self.bus.borrow().read_register(MemRegister::IF) & flag as u8;
 		self.bus.borrow_mut().write_register(MemRegister::IF, new_if);
 
 		self.ime = false;
 
 		self.push16(self.pc);
-		self.pc = source as u16
+		self.pc = source as u16;
 
-		// TODO lasts 25 T-states (cycles)
+		self.wait_cycles = 25;
 
 	}
 

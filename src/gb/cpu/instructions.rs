@@ -75,12 +75,17 @@ lazy_static!{
 		Instruction::new(vec![0xFB], 4, "EI", EI),
 		Instruction::new(vec![0xF4], 4, "DI", DI),
 
+		Instruction::new(vec![0x76], 4, "HALT", HALT),
+		Instruction::new(vec![0x10], 4, "STOP", STOP),
+
 		// jump / subroutine instructions
 		Instruction::new(vec![0x20, 0x30, 0x18, 0x28, 0x38], 12, "JR (cond), e8", JR_COND_E8),
 		Instruction::new(vec![0xC3, 0xC2, 0xD2, 0xCA, 0xDA], 16, "JP (cond), a16", JP_COND_A16),
 		Instruction::new(vec![0xE9], 4, "JP HL", JP_HL),
 		Instruction::new(vec![0xC4, 0xD4, 0xCC, 0xDC, 0xCD], 24, "CALL (cond), a16", CALL_COND_A16),
 		
+		Instruction::new(vec![0xC7, 0xD7, 0xE7, 0xF7, 0xCF, 0xDF, 0xEF, 0xFF], 16, "RST vec", RST),
+
 		Instruction::new(vec![0xC0, 0xD0, 0xC8, 0xD8], 20, "RET (cond)", RET_COND),
 		Instruction::new(vec![0xC9], 16, "RET", RET_COND),
 		Instruction::new(vec![0xD9], 16, "RETI", RET_COND),
@@ -202,6 +207,33 @@ fn DI(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.ime = false;
 
 	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: HALT
+OPCODES: 0x76
+DESC: Halts the CPU until and interrupt is serviced
+FLAGS: - - - -
+
+*/
+fn HALT(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	cpu.halted = true;
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: STOP
+OPCODES: 0x10
+DESC: Unimplemented. Permenently halts the CPU
+FLAGS: - - - -
+
+*/
+fn STOP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	println!("!!! STOP INSTRUCTION IS UNIMPLEMENTED !!!");
 }
 
 /*
@@ -495,6 +527,23 @@ fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let new_addr = (hi_byte as u16) << 8 | low_byte as u16;
 	cpu.pc = new_addr;
 
+}
+
+/*
+
+MNEMONIC: RST vec
+OPCODES: 0x(C-F)7, 0x(C-F)F
+DESC: Calls the pre-defined reset vector
+FLAGS: - - - -
+
+*/
+fn RST(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let vec = ((opcode >> 3) & 0x7) * 8;
+
+	cpu.push16(cpu.pc);
+
+	cpu.pc += vec as u16;
 }
 
 // ! memory instructions
