@@ -41,9 +41,10 @@ impl Gameboy {
 		let log = File::create("emu.log").expect("unable to open log file");
 		let mut log_writer = BufWriter::new(&log);
 
-		self.cpu.pc = 0xFF;
+		self.cpu.pc = 0x0;
 
 		// temp
+		/*
 		loop {
 			let result = self.cpu.cycle();
 	
@@ -68,12 +69,21 @@ impl Gameboy {
 				break;
 			}
 		}
+		*/
 
 	}
 
-	pub fn tick(delta_time: u64) {
+	pub fn tick(&mut self) {
 
-		
+		println!("tick.");
+
+		self.cycles += 1;
+
+		if self.cpu.wait_cycles == 0 {
+			self.cpu.cycle();
+		} else {
+			self.cpu.wait_cycles -= 1;
+		}
 
 	}
 
