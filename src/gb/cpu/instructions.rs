@@ -1223,12 +1223,16 @@ fn RLCA_RRCA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let (new_value, carry): (u8, bool);
 
+	let old_a = cpu.registers.get_8bit_reg(Register8Bit::A);
+
 	if opcode >> 3 == 1 {
 		// RRCA
-		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shr(1);
+		new_value = cpu.registers.get_8bit_reg(Register8Bit::A).rotate_right(1);
+		carry = old_a & 1 == 1;
 	} else {
-		//RLCA
-		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shl(1);
+		// RLCA
+		new_value = cpu.registers.get_8bit_reg(Register8Bit::A).rotate_left(1);
+		carry = (old_a & 0x80) >> 7 == 1;
 	}
 
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
@@ -1252,10 +1256,16 @@ fn RLA_RRA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let (new_value, carry): (u8, bool);
 	let is_rla = (opcode & 0x8) >> 3 == 0;
 
+	let old_a = cpu.registers.get_8bit_reg(Register8Bit::A);
+
 	if is_rla {
-		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shl(1);
+		// RLA
+		new_value = cpu.registers.get_8bit_reg(Register8Bit::A).rotate_left(1);
+		carry = old_a & 1 == 1;
 	} else {
-		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shr(1);
+		// RRA
+		new_value = cpu.registers.get_8bit_reg(Register8Bit::A).rotate_right(1);
+		carry = (old_a & 0x80) >> 7 == 1;
 	}
 
 	let old_carry = match is_rla {
@@ -1281,7 +1291,7 @@ fn RLA_RRA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 MNEMONIC: RLC r8 / RRC r8
 OPCODES: 0x0(0-7) / 0x0(8-F)
-DESC: Shifts left / right into the carry flag
+DESC: Rotates left / right into the carry flag
 FLAGS: Z 0 0 C
 
 */
@@ -1291,16 +1301,22 @@ fn RLC_RRC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
 
+	let old_value = cpu.get_8bit_reg(r8);
+
 	if r8 == Register8Bit::HL {
 		*cycles = 16;
 	}
+	
+	// ? when rotating values the value shifted out should wrap back around (rotating != shifting)
 
 	if opcode >> 3 == 1 {
 		// RRC
-		(new_value, carry) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
+		new_value = cpu.registers.get_8bit_reg(r8).rotate_right(1);
+		carry = (old_value & 0x80) >> 7 == 1;
 	} else {
 		//RLC
-		(new_value, carry) = cpu.registers.get_8bit_reg(r8).overflowing_shl(1);
+		new_value = cpu.registers.get_8bit_reg(r8).rotate_left(1);
+		carry = old_value & 1 == 1;
 	}
 
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
@@ -1315,7 +1331,7 @@ fn RLC_RRC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 MNEMONIC: RL r8 / RR r8
 OPCODES: 0x1(0-7), 0x1(8-F)
-DESC: Shifts r8 to the left / right. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
+DESC: Rotates r8 to the left / right. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
 FLAGS: Z 0 0 C
 
 */
@@ -1327,13 +1343,17 @@ fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		*cycles = 16;
 	}
 
+	let old_value = cpu.get_8bit_reg(r8);
+
 	let (new_value, carry): (u8, bool);
 	let is_rl = (opcode >> 3) & 1 == 0;
 
 	if is_rl {
-		(new_value, carry) = cpu.registers.get_8bit_reg(r8).overflowing_shl(1);
+		new_value = cpu.registers.get_8bit_reg(r8).rotate_left(1);
+		carry = (old_value & 0x80) >> 7 == 1;
 	} else {
-		(new_value, carry) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
+		new_value = cpu.registers.get_8bit_reg(r8).rotate_right(1);
+		carry = old_value & 1 == 1;
 	}
 
 	let old_carry = match is_rl {
@@ -1348,5 +1368,5 @@ fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::Z, new_value == 0);
 
 	cpu.pc += 1;
-	
+
 }
