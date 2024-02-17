@@ -162,7 +162,15 @@ lazy_static!{
 
 	];
 
-	pub static ref PREFIXED_INSTRUCTIONS: Vec<Instruction> = vec![];
+	pub static ref PREFIXED_INSTRUCTIONS: Vec<Instruction> = vec![
+		
+		Instruction::new(vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07], 8, "RLC r8", RLC_RRC_R8),
+		Instruction::new(vec![0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F], 8, "RRC r8", RLC_RRC_R8),
+		
+		Instruction::new(vec![0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17], 8, "RL r8", RL_RR_R8),
+		Instruction::new(vec![0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F], 8, "RR r8", RL_RR_R8),
+
+	];
 
 }
 
@@ -1215,12 +1223,12 @@ fn RLCA_RRCA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let (new_value, carry): (u8, bool);
 
-	if opcode >> 3 == 0 {
+	if opcode >> 3 == 1 {
 		// RRCA
-		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shl(1);
+		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shr(1);
 	} else {
 		//RLCA
-		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shr(1);
+		(new_value, carry) = cpu.registers.get_8bit_reg(Register8Bit::A).overflowing_shl(1);
 	}
 
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
@@ -1235,7 +1243,7 @@ fn RLCA_RRCA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 MNEMONIC: RLA, RRA
 OPCODES: 0x17, 0x1F
-DESC: Shifts the A register to the left. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
+DESC: Shifts the A register to the left / right. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
 FLAGS: 0 0 0 C
 
 */
@@ -1261,4 +1269,84 @@ fn RLA_RRA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::C, carry);
 
 	cpu.pc += 1;
+}
+
+/*
+?##################################################
+?##########	 Unprefixed Instructions	 ##########
+?##################################################
+*/
+
+/*
+
+MNEMONIC: RLC r8 / RRC r8
+OPCODES: 0x0(0-7) / 0x0(8-F)
+DESC: Shifts left / right into the carry flag
+FLAGS: Z 0 0 C
+
+*/
+fn RLC_RRC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let (new_value, carry): (u8, bool);
+
+	let r8 = Register8Bit::from_r8(opcode & 0x7);
+
+	if r8 == Register8Bit::HL {
+		*cycles = 16;
+	}
+
+	if opcode >> 3 == 1 {
+		// RRC
+		(new_value, carry) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
+	} else {
+		//RLC
+		(new_value, carry) = cpu.registers.get_8bit_reg(r8).overflowing_shl(1);
+	}
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::C, carry);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: RL r8 / RR r8
+OPCODES: 0x1(0-7), 0x1(8-F)
+DESC: Shifts r8 to the left / right. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
+FLAGS: Z 0 0 C
+
+*/
+fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let r8 = Register8Bit::from_r8(opcode & 0x7);
+
+	if r8 == Register8Bit::HL {
+		*cycles = 16;
+	}
+
+	let (new_value, carry): (u8, bool);
+	let is_rl = (opcode >> 3) & 1 == 0;
+
+	if is_rl {
+		(new_value, carry) = cpu.registers.get_8bit_reg(r8).overflowing_shl(1);
+	} else {
+		(new_value, carry) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
+	}
+
+	let old_carry = match is_rl {
+		true => cpu.registers.get_flag(Flag::C) as u8,
+		false => (cpu.registers.get_flag(Flag::C) as u8) << 7
+	};
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value | old_carry);
+
+	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::C, carry);
+	cpu.registers.set_flag(Flag::Z, new_value == 0);
+
+	cpu.pc += 1;
+	
 }
