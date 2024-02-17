@@ -170,6 +170,14 @@ lazy_static!{
 		Instruction::new(vec![0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17], 8, "RL r8", RL_RR_R8),
 		Instruction::new(vec![0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F], 8, "RR r8", RL_RR_R8),
 
+		Instruction::new(vec![0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27], 8, "SLA r8", SLA_SRA_R8),
+		Instruction::new(vec![0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F], 8, "SRA r8", SLA_SRA_R8),
+
+		Instruction::new(vec![0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37], 8, "SWAP r8", SWAP_R8),
+		Instruction::new(vec![0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F], 8, "SRL r8", SRL_R8),
+
+
+
 	];
 
 }
@@ -1215,7 +1223,7 @@ fn ADD_HL_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 MNEMONIC: RLCA, RRCA
 OPCODES: 0x07, 0x0F
-DESC: Shifts the A register to the left. The carry bit is set to the shifted out bit
+DESC: Rotates the A register to the left / right. The carry bit is set to the shifted out bit
 FLAGS: 0 0 0 C
 
 */
@@ -1247,7 +1255,7 @@ fn RLCA_RRCA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 MNEMONIC: RLA, RRA
 OPCODES: 0x17, 0x1F
-DESC: Shifts the A register to the left / right. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
+DESC: Rotates the A register to the left / right. Wraps around to the carry bit, then carry bit is set to the shifted out bit.
 FLAGS: 0 0 0 C
 
 */
@@ -1323,6 +1331,7 @@ fn RLC_RRC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::C, carry);
+	cpu.registers.set_flag(Flag::Z, new_value == 0);
 
 	cpu.pc += 1;
 }
@@ -1369,4 +1378,103 @@ fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.pc += 1;
 
+}
+
+/*
+
+MNEMONIC: SLA r8 / SRA r8
+OPCODES: 0x2(0-7) / 0x2(8-F)
+DESC: Shifts left / right into the carry flag
+FLAGS: Z 0 0 C
+
+*/
+fn SLA_SRA_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let (new_value, carry): (u8, bool);
+
+	let r8 = Register8Bit::from_r8(opcode & 0x7);
+
+	let old_value = cpu.get_8bit_reg(r8);
+
+	if r8 == Register8Bit::HL {
+		*cycles = 16;
+	}
+
+	if opcode >> 3 == 1 {
+		// RRC
+		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
+		carry = (old_value & 0x80) >> 7 == 1;
+	} else {
+		//RLC
+		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shl(1);
+		carry = old_value & 1 == 1;
+	}
+
+	//? Arithmetic shifts preserve the sign bit (bit 7) (https://open4tech.com/wp-content/uploads/2016/11/Arithmetic_Shift.jpg)
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value | (old_value & 0x80));
+
+	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::C, carry);
+	cpu.registers.set_flag(Flag::Z, new_value == 0);
+
+	cpu.pc += 1;
+
+}
+
+/*
+
+MNEMONIC: SWAP r8
+OPCODES: 0x3(0-7)
+DESC: Swaps the lower four bits of r8 with the upper four
+FLAGS: Z 0 0 0
+
+*/
+fn SWAP_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
+	let r8 = Register8Bit::from_r8(opcode & 0x7);
+	let old_value = cpu.get_8bit_reg(r8);
+
+	if r8 == Register8Bit::HL {
+		*cycles = 16;
+	}
+
+	let new_value = ((old_value & 0xF) << 0x4) | (old_value & 0xF0) >> 0x4;
+
+	cpu.set_8bit_reg(r8, new_value);
+
+	cpu.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::Z, new_value == 0);
+
+	cpu.pc += 1;
+}
+
+/*
+
+MNEMONIC: SRL r8
+OPCODES: 0x3(8-F)
+DESC: Logical shift r8 to the right
+FLAGS: Z 0 0 C
+
+*/
+fn SRL_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+	let (new_value, carry): (u8, bool);
+
+	let r8 = Register8Bit::from_r8(opcode & 0x7);
+
+	let old_value = cpu.get_8bit_reg(r8);
+
+	if r8 == Register8Bit::HL {
+		*cycles = 16;
+	}
+
+	(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
+	carry = (old_value & 0x80) >> 7 == 1;
+
+	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
+	cpu.registers.set_flag(Flag::C, carry);
+	cpu.registers.set_flag(Flag::Z, new_value == 0);
+
+	cpu.pc += 1;
 }
