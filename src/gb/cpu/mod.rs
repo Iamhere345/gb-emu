@@ -55,11 +55,12 @@ impl CPU {
 		let mut executed: bool = false;
 
 		if !self.halted {
+			'instruction_execute:
 			for instruction in if prefixed { PREFIXED_INSTRUCTIONS.iter() } else { INSTRUCTIONS.iter() } {
 				for opcode in instruction.opcodes.iter() {
 					if byte == *opcode {
 
-						println!("[0x{:x}] {}", self.pc, instruction.mnemonic);
+						//println!("[0x{:x}] {}", self.pc, instruction.mnemonic);
 
 						let mut cycles = instruction.cycles;
 
@@ -67,6 +68,8 @@ impl CPU {
 
 						self.wait_cycles = cycles;
 						executed = true;
+
+						break 'instruction_execute;
 					}
 				}
 			}
@@ -169,7 +172,7 @@ impl CPU {
 
 		self.registers.set_flag(Flag::C, did_overflow);
 		self.registers.set_flag(Flag::N, false);
-		self.registers.set_flag(Flag::H, (new_value & 0xF).overflowing_add(rhs & 0xF).0 > 0xF);
+		self.registers.set_flag(Flag::H, (lhs & 0xF).overflowing_add(rhs & 0xF).0 > 0xF);
 		self.registers.set_flag(Flag::Z, new_value == 0);
 
 		new_value
@@ -182,7 +185,7 @@ impl CPU {
 		self.registers.set_flag(Flag::C, did_overflow);
 		self.registers.set_flag(Flag::N, false);
 		// check if there was an overflow from the 11th bit (0b_0000_1000_0000_0000)
-		self.registers.set_flag(Flag::H, (new_value & 0x800).overflowing_add(rhs & 0x800).0 > 0x800);
+		self.registers.set_flag(Flag::H, (lhs & 0x800).overflowing_add(rhs & 0x800).0 > 0x800);
 		self.registers.set_flag(Flag::Z, new_value == 0);
 
 		new_value
@@ -193,7 +196,7 @@ impl CPU {
 
 		self.registers.set_flag(Flag::C, did_overflow);
 		self.registers.set_flag(Flag::N, true);
-		self.registers.set_flag(Flag::H, (new_value & 0xF).overflowing_sub(rhs & 0xF).0 > 0xF);
+		self.registers.set_flag(Flag::H, (lhs & 0xF).overflowing_sub(rhs & 0xF).0 > 0xF);
 		self.registers.set_flag(Flag::Z, new_value == 0);
 
 		new_value
@@ -204,7 +207,7 @@ impl CPU {
 
 		self.registers.set_flag(Flag::C, did_overflow);
 		self.registers.set_flag(Flag::N, true);
-		self.registers.set_flag(Flag::H, (new_value & 0x800).overflowing_sub(rhs & 0x800).0 > 0x800);
+		self.registers.set_flag(Flag::H, (lhs & 0x800).overflowing_sub(rhs & 0x800).0 > 0x800);
 		self.registers.set_flag(Flag::Z, new_value == 0);
 
 		new_value
