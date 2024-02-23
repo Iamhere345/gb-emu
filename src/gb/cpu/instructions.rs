@@ -73,7 +73,7 @@ lazy_static!{
 		Instruction::new(vec![0x27], 4, "DAA", DAA),
 
 		Instruction::new(vec![0xFB], 4, "EI", EI),
-		Instruction::new(vec![0xF4], 4, "DI", DI),
+		Instruction::new(vec![0xF3], 4, "DI", DI),
 
 		Instruction::new(vec![0x76], 4, "HALT", HALT),
 		Instruction::new(vec![0x10], 4, "STOP", STOP),
@@ -399,13 +399,14 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		}
 	}
 
+	// the offset is fetched every time, even if the jump isn't executed
+	let offset: i8 = get_imm8(cpu) as i8 + 1;
+
 	if !jump {
 		cpu.pc += 1;
 		*cycles = 8;
 		return;
 	}
-
-	let offset: i8 = get_imm8(cpu) as i8 + 1;
 
 	let offset_unsigned: u16 = offset.abs().try_into().unwrap();
 
@@ -559,6 +560,7 @@ fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	// set pc to the return address
 	let new_addr = (hi_byte as u16) << 8 | low_byte as u16;
+	let new_addr = cpu.pop16();
 	cpu.pc = new_addr;
 
 }

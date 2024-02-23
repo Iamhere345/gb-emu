@@ -155,7 +155,7 @@ impl Bus {
 		}
 
 		if addr >= WRAM_START && addr <= WRAM_END {
-			self.wram[(addr - WRAM_START - 1) as usize] = write;
+			self.wram[(addr - WRAM_START) as usize] = write;
 		}
 
 		if addr >= HRAM_START && addr <= HRAM_END {
