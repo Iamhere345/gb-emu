@@ -1,7 +1,7 @@
 pub mod registers;
 mod instructions;
 
-use crate::gb::bus::*;
+use crate::bus::*;
 use self::registers::*;
 use self::instructions::*;
 

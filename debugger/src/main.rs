@@ -2,9 +2,7 @@ use std::time::Duration;
 use std::io::{prelude::*, BufWriter};
 use std::fs;
 
-use gb::Gameboy;
-
-mod gb;
+use emu::Gameboy;
 
 const CLOCK_CYCLE_SPEED: f64 = 1.0 / (4194304.0 * 1_000_000_000.0);
 
@@ -14,7 +12,7 @@ fn main() {
 	//../tetris.gb
 
 	let mut gb: Gameboy = Gameboy::new();
-	gb.init(include_bytes!("../tests/cpu_instrs/individual/06-ld r,r.gb"));
+	gb.init(include_bytes!("../../tests/cpu_instrs/individual/06-ld r,r.gb"));
 
 	//let log = File::create("emu.log").expect("unable to open log file");
 	//let mut log_writer = BufWriter::new(&log);
@@ -22,7 +20,7 @@ fn main() {
 		.create(true)
 		.write(true)
 		.truncate(true)
-		.open("emu.log")
+		.open("../emu.log")
 		.expect("unable to open or create log file");
 
     let mut log_writer = BufWriter::new(log);
