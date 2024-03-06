@@ -70,9 +70,9 @@ impl Gameboy {
 
 	}
 
-	pub fn tick(&mut self, log: &mut BufWriter<File>) {
+	pub fn tick(&mut self, /*log: &mut BufWriter<File>*/) {
 
-		//println!("tick.");
+		
 
 		self.cycles += 1;
 
@@ -93,13 +93,13 @@ impl Gameboy {
 			let pc2 = self.bus.borrow().read_byte(self.cpu.pc + 2);
 			let pc3 = self.bus.borrow().read_byte(self.cpu.pc + 3);
 
-			println!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n", 
-			a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3);
+			//println!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n", 
+			//a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3);
 
-			log.write_all(format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n", 
-			a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3).as_bytes()).expect("unable to write to log file");
+			//log.write_all(format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n", 
+			//a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3).as_bytes()).expect("unable to write to log file");
 
-			log.flush().expect("unable to flush buffer to log file");
+			//log.flush().expect("unable to flush buffer to log file");
 			
 			self.cpu.cycle();
 			
@@ -111,6 +111,7 @@ impl Gameboy {
 			*/
 
 		} else {
+			println!("tick.");
 			self.cpu.wait_cycles -= 1;
 		}
 
