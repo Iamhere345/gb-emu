@@ -579,7 +579,7 @@ fn RST(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.push16(cpu.pc);
 
-	cpu.pc += vec as u16;
+	cpu.pc = vec as u16;
 }
 
 // ! memory instructions
