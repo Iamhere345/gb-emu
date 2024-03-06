@@ -12,8 +12,12 @@ pub struct Debugger {
 
 impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
+
+		let mut emu = Gameboy::new();
+		emu.init(include_bytes!("../../tests/cpu_instrs/individual/06-ld r,r.gb"));
+
 		Self {
-			emu: Gameboy::new(),
+			emu: emu,
 
 			control: Control::new()
 		}
