@@ -5,24 +5,23 @@ use eframe::egui::*;
 use emu::Gameboy;
 
 pub struct Control {
-	paused: bool,
-	speed: u8,
+	pub paused: bool,
+	pub speed: u8,
 }
 
 impl Control {
 
 	pub fn new() -> Self {
 		Self {
-			paused: false,
+			paused: true,
 			speed: 1,
 		}
 	}
 
 	pub fn show(&mut self, ctx: &Context, ui: &mut Ui, emu: &mut Gameboy) {
 		
-		ui.label("\nControl");
+		ui.label("Control");
 		
-
 		ui.horizontal(|ui| {
 			if ui.button(if self.paused == true { "Start" } else { "Stop" }).clicked() {
 				self.paused = !self.paused;
@@ -38,7 +37,9 @@ impl Control {
 			}
 
 			if ui.button("Step").clicked() {
-				emu.tick();
+				for _ in 0..self.speed {
+					emu.tick();
+				}
 			};
 		});
 	}

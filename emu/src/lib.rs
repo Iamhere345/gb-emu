@@ -12,8 +12,8 @@ pub mod cpu;
 pub mod bus;
 
 pub struct Gameboy {
-	cpu: CPU,
-	bus: Rc<RefCell<Bus>>,
+	pub cpu: CPU,
+	pub bus: Rc<RefCell<Bus>>,
 	pub cycles: u64,
 }
 
@@ -76,7 +76,7 @@ impl Gameboy {
 
 		self.cycles += 1;
 
-		if self.cpu.wait_cycles == 0 {
+		//if self.cpu.wait_cycles == 0 {
 
 			let a = self.cpu.registers.get_8bit_reg(Register8Bit::A);
 			let f = self.cpu.registers.get_8bit_reg(Register8Bit::F);
@@ -103,6 +103,15 @@ impl Gameboy {
 			
 			self.cpu.cycle();
 			
+			if self.bus.borrow().read_byte(0xFF02) == 0x81 {
+
+				let serial_char: char = self.bus.borrow().read_byte(0xFF01) as char;
+
+				print!("{}", serial_char);
+
+				self.bus.borrow_mut().write_byte(0xFF02, 0);
+			}
+
 
 			/*
 			write!(log,
@@ -110,10 +119,10 @@ impl Gameboy {
 				a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3).expect("unable to write to log file");
 			*/
 
-		} else {
-			println!("tick.");
-			self.cpu.wait_cycles -= 1;
-		}
+		//} else {
+			//println!("tick.");
+			//self.cpu.wait_cycles = 0;
+		//}
 
 	}
 

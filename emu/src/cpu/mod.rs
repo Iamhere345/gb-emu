@@ -15,6 +15,7 @@ pub struct CPU {
 	pub ime: bool,			// interrupt master enable
 	pub halted: bool,		// used with the HALT instruction
 	pub wait_cycles: u16,	// used to count the number of cycles left until an instruction has finished
+	pub current_instruction: String,
 }
 
 #[allow(dead_code)]
@@ -28,6 +29,7 @@ impl CPU {
 			ime: false,
 			halted: false,
 			wait_cycles: 0,
+			current_instruction: String::new(),
 		}
 	}
 
@@ -61,6 +63,8 @@ impl CPU {
 					if byte == *opcode {
 
 						println!("[0x{:x}] {}", self.pc, instruction.mnemonic);
+
+						self.current_instruction = instruction.mnemonic.to_string();
 
 						let mut cycles = instruction.cycles;
 
