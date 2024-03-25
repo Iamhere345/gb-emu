@@ -76,8 +76,9 @@ impl Gameboy {
 
 		self.cycles += 1;
 
-		//if self.cpu.wait_cycles == 0 {
+		if self.cpu.wait_cycles == 0 {
 
+			/*
 			let a = self.cpu.registers.get_8bit_reg(Register8Bit::A);
 			let f = self.cpu.registers.get_8bit_reg(Register8Bit::F);
 			let b = self.cpu.registers.get_8bit_reg(Register8Bit::B);
@@ -92,6 +93,7 @@ impl Gameboy {
 			let pc1 = self.bus.borrow().read_byte(self.cpu.pc + 1);
 			let pc2 = self.bus.borrow().read_byte(self.cpu.pc + 2);
 			let pc3 = self.bus.borrow().read_byte(self.cpu.pc + 3);
+			*/
 
 			//println!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n", 
 			//a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3);
@@ -119,10 +121,10 @@ impl Gameboy {
 				a,f,b,c,d,e,h,l,sp,pc,pc0,pc1,pc2,pc3).expect("unable to write to log file");
 			*/
 
-		//} else {
+		} else {
 			//println!("tick.");
-			//self.cpu.wait_cycles = 0;
-		//}
+			self.cpu.wait_cycles = 0;
+		}
 
 	}
 
