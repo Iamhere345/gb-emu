@@ -74,7 +74,7 @@ impl Gameboy {
 
 		
 
-		self.cycles += 1;
+		self.cycles += 4;
 
 		if self.cpu.wait_cycles == 0 {
 

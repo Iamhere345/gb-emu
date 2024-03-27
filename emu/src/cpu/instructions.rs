@@ -28,15 +28,15 @@ impl Cond {
 }
 
 pub fn get_imm8(cpu: &mut CPU) -> u8 {
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 	cpu.bus.borrow().read_byte(cpu.pc)
 }
 
 pub fn get_imm16(cpu: &mut CPU) -> u16 {
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 	let lo_byte = cpu.bus.borrow().read_byte(cpu.pc);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 	let hi_byte = cpu.bus.borrow().read_byte(cpu.pc);
 
 	((hi_byte as u16) << 8) | lo_byte as u16
@@ -211,7 +211,7 @@ FLAGS: - - - -
 
 */
 fn NOP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -226,7 +226,7 @@ fn EI(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	// ? accuracy: the effects of EI are delayed by one instruction (important for the halt bug)
 	cpu.ime = true;
 	
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -240,7 +240,7 @@ FLAGS: - - - -
 fn DI(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.ime = false;
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -255,7 +255,7 @@ fn HALT(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.halted = true;
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -286,7 +286,7 @@ fn CPL(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::N, true);
 	cpu.registers.set_flag(Flag::H, true);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -304,7 +304,7 @@ fn CCF(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::C, !cpu.registers.get_flag(Flag::C));
 	
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -322,7 +322,7 @@ fn SCF(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::C, true);
 	
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -364,7 +364,7 @@ fn DAA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::H, false);
 	cpu.registers.set_flag(Flag::C, should_carry);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 
@@ -403,7 +403,7 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let offset: i8 = get_imm8(cpu) as i8 + 1;
 
 	if !jump {
-		cpu.pc += 1;
+		cpu.pc = cpu.pc.wrapping_add(1);
 		*cycles = 8;
 		return;
 	}
@@ -447,7 +447,7 @@ fn JP_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	if !jump {
-		cpu.pc += 1;
+		cpu.pc = cpu.pc.wrapping_add(1);
 		*cycles = 12;
 		return;
 	}
@@ -498,7 +498,7 @@ fn CALL_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	if !jump {
-		cpu.pc += 1;
+		cpu.pc = cpu.pc.wrapping_add(1);
 		*cycles = 12;
 		return;
 	}
@@ -547,7 +547,7 @@ fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	if !jump {
-		cpu.pc += 1;
+		cpu.pc = cpu.pc.wrapping_add(1);
 		*cycles = 8;
 		return;
 	}
@@ -603,7 +603,7 @@ fn LD_R8_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		*cycles = 8;
 	}
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -617,17 +617,17 @@ FLAGS: - - - -
 fn LD_R16_IMM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let dest = Register16Bit::from_r16(opcode >> 4);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 	let lo_src = cpu.bus.borrow().read_byte(cpu.pc);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 	let hi_src = cpu.bus.borrow().read_byte(cpu.pc);
 
 	let src: u16 = ((hi_src as u16) << 8) | lo_src as u16;
 
 	cpu.registers.set_16bit_reg(dest, src);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 
 }
 
@@ -642,12 +642,12 @@ FLAGS: - - - -
 fn LD_R8_IMM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let dest = Register8Bit::from_r8(opcode >> 3);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 	let src = cpu.bus.borrow().read_byte(cpu.pc);
 
 	cpu.set_8bit_reg(dest, src);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -669,7 +669,7 @@ fn LD_R16MEM_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	// postinc or postdec
 	cpu.registers.set_16bit_reg(dest_info.0, (dest as i16 + dest_info.1 as i16) as u16);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 
 }
 
@@ -694,7 +694,7 @@ fn LD_A_R16MEM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	// postinc or postdec
 	cpu.registers.set_16bit_reg(src_info.0, (src as i16 + src_info.1 as i16) as u16);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 
 }
 
@@ -712,7 +712,7 @@ fn LD_A_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -729,7 +729,7 @@ fn LD_A16_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.bus.borrow_mut().write_byte(addr, a_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -746,7 +746,7 @@ fn LDH_A_A8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let new_value = cpu.bus.borrow().read_byte(addr);
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -764,7 +764,7 @@ fn LDH_A8_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.bus.borrow_mut().write_byte(addr, a_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -781,7 +781,7 @@ fn LDH_A_C(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -798,7 +798,7 @@ fn LDH_C_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.bus.borrow_mut().write_byte(addr, a_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 // ! stack instructions
@@ -820,7 +820,7 @@ fn PUSH_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	target_addr = cpu.dec_sp();
 	cpu.bus.borrow_mut().write_byte(target_addr, (target >> 4) as u8);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -842,7 +842,7 @@ fn POP_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let new_value = (hi_byte as u16) << 8 | low_byte as u16;
 	cpu.registers.set_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3), new_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -857,7 +857,7 @@ fn LD_SP_HL(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let hl_value = cpu.registers.get_16bit_reg(Register16Bit::HL);
 	cpu.registers.set_16bit_reg(Register16Bit::SP, hl_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -878,7 +878,7 @@ fn LD_HL_SP_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::H, (sp_value & 0xF) + (offset as u16 & 0xF) > 0xF);
 	cpu.registers.set_flag(Flag::C, (sp_value & 0xFF) + (offset as u16 & 0xFF) > 0xFF);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -900,7 +900,7 @@ fn ADD_SP_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::H, (sp_value & 0xF) + (offset as u16 & 0xF) > 0xF);
 	cpu.registers.set_flag(Flag::C, (sp_value & 0xFF) + (offset as u16 & 0xFF) > 0xFF);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -912,10 +912,10 @@ FLAGS: - - - -
 
 */
 fn LD_A16_SP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 	let lo_addr = cpu.bus.borrow().read_byte(cpu.pc);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 	let hi_addr = cpu.bus.borrow().read_byte(cpu.pc);
 
 	let addr: u16 = ((hi_addr as u16) << 8) | lo_addr as u16;
@@ -924,7 +924,7 @@ fn LD_A16_SP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.bus.borrow_mut().write_byte(addr, (sp & 0xFF) as u8);
 	cpu.bus.borrow_mut().write_byte(addr + 1, (sp >> 8) as u8);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 
 }
 
@@ -961,7 +961,7 @@ fn ADD_ADC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.set_8bit_reg(Register8Bit::A, new_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -995,7 +995,7 @@ fn SUB_SBC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.set_8bit_reg(Register8Bit::A, new_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1028,7 +1028,7 @@ fn AND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.registers.set_flag(Flag::H, true);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1059,7 +1059,7 @@ fn XOR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		cpu.registers.set_flag(Flag::Z, true);
 	}
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1090,7 +1090,7 @@ fn OR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		cpu.registers.set_flag(Flag::Z, true);
 	}
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1117,7 +1117,7 @@ fn CP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.sub_8bit(a_value, rhs_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1140,7 +1140,7 @@ fn INC_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	// restore flags
 	cpu.registers.set_8bit_reg(Register8Bit::F, old_flags);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1163,7 +1163,7 @@ fn DEC_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	// restore flags
 	cpu.registers.set_8bit_reg(Register8Bit::F, old_flags);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1186,7 +1186,7 @@ fn INC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.registers.set_flag(Flag::C, old_carry);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 
 }
 
@@ -1210,7 +1210,7 @@ fn DEC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.registers.set_flag(Flag::C, old_carry);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 
 }
 
@@ -1234,7 +1234,7 @@ fn ADD_HL_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.registers.set_flag(Flag::Z, old_z);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 // ! 8-bit shift, rotate and bit instructions
@@ -1268,7 +1268,7 @@ fn RLCA_RRCA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::C, carry);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1306,12 +1306,12 @@ fn RLA_RRA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::C, carry);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
 ?##################################################
-?##########	 Unprefixed Instructions	 ##########
+?##########	  Prefixed Instructions	 	###########
 ?##################################################
 */
 
@@ -1353,7 +1353,7 @@ fn RLC_RRC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::C, carry);
 	cpu.registers.set_flag(Flag::Z, new_value == 0);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1396,7 +1396,7 @@ fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::C, carry);
 	cpu.registers.set_flag(Flag::Z, new_value == 0);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 
 }
 
@@ -1420,24 +1420,32 @@ fn SLA_SRA_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		*cycles = 16;
 	}
 
-	if opcode >> 3 == 1 {
-		// RRC
-		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
-		carry = (old_value & 0x80) >> 7 == 1;
-	} else {
-		//RLC
+	let is_sla = (opcode >> 3) & 0x80 == 0;
+
+	if is_sla {
+		// SLA
 		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shl(1);
+		carry = (old_value & 0x80) >> 7 == 1;
+		println!("old: 0x{:x} new: 0x{:x}", old_value, new_value);
+	} else {
+		//SRA
+		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
 		carry = old_value & 1 == 1;
+		println!("SRA?")
 	}
 
-	//? Arithmetic shifts preserve the sign bit (bit 7) (https://open4tech.com/wp-content/uploads/2016/11/Arithmetic_Shift.jpg)
-	cpu.registers.set_8bit_reg(Register8Bit::A, new_value | (old_value & 0x80));
+	//? Arithmetic shifts preserve the sign bit (bit 7), doesnt apply to left shift (https://open4tech.com/wp-content/uploads/2016/11/Arithmetic_Shift.jpg)
+	if !is_sla {
+		cpu.registers.set_8bit_reg(r8, new_value | (old_value & 0x80));
+	} else {
+		cpu.registers.set_8bit_reg(r8, new_value);
+	}
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::C, carry);
 	cpu.registers.set_flag(Flag::Z, new_value == 0);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 
 }
 
@@ -1465,7 +1473,7 @@ fn SWAP_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::Z, new_value == 0);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1496,7 +1504,7 @@ fn SRL_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::C, carry);
 	cpu.registers.set_flag(Flag::Z, new_value == 0);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1522,7 +1530,7 @@ fn BIT_U3_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.registers.set_flag(Flag::N, false);
 	cpu.registers.set_flag(Flag::H, true);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1546,7 +1554,7 @@ fn RES_U3_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.set_8bit_reg(r8, new_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -1570,5 +1578,5 @@ fn SET_U3_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	cpu.set_8bit_reg(r8, new_value);
 
-	cpu.pc += 1;
+	cpu.pc = cpu.pc.wrapping_add(1);
 }

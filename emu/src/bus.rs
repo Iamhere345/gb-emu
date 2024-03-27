@@ -92,7 +92,7 @@ pub struct Bus {
 	// TODO rom bank switching
 	// these are probably just going to be placeholders until the i write actual devices populate the bus
 
-	memory: [u8; 0xFFFF],
+	memory: [u8; 64 * 1024],
 
 	wram: [u8; (WRAM_END - WRAM_START) as usize],
 	hram: [u8; (HRAM_END - HRAM_START) as usize],
@@ -117,7 +117,7 @@ impl Bus {
 	pub fn new() -> Self {
 
 		Bus {
-			memory: [0; 0xFFFF],
+			memory: [0; 64 * 1024],
 
 			wram: [0; (WRAM_END - WRAM_START) as usize],
 			hram: [0; (HRAM_END - HRAM_START) as usize],
@@ -127,7 +127,7 @@ impl Bus {
 
 	pub fn read_byte(&self, addr: u16) -> u8 {
 
-		#[cfg(test)]
+		//#[cfg(test)]
 		return self.memory[addr as usize];
 
 		// TODO replace with cart memory
@@ -154,6 +154,9 @@ impl Bus {
 
 	pub fn write_byte(&mut self, addr: u16, write: u8) {
 
+		self.memory[addr as usize] = write;
+		return;
+
 		if addr >= ROM_BANK1_START && addr <= ROM_BANK2_END {
 			self.memory[addr as usize] = write;
 		}
@@ -174,6 +177,10 @@ impl Bus {
 
 	pub fn write_register(&mut self, register: MemRegister, write: u8) {
 		self.write_byte(register as u16, write)
+	}
+
+	pub fn clear_test_mem(&mut self) {
+		for byte in self.memory.iter_mut() { *byte = 0 }
 	}
 
 }

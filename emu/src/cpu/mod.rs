@@ -62,7 +62,7 @@ impl CPU {
 				for opcode in instruction.opcodes.iter() {
 					if byte == *opcode {
 
-						println!("[0x{:x}] {}", self.pc, instruction.mnemonic);
+						println!("[0x{:x}][0x{:x}] {}", self.pc, byte, instruction.mnemonic);
 
 						self.current_instruction = instruction.mnemonic.to_string();
 
