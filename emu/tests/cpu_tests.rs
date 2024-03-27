@@ -1,6 +1,6 @@
 use std::{default, fs};
 
-use emu::{bus::*, Gameboy, cpu::*};
+use emu::{bus::*, Gameboy, cpu::*, cpu::registers::*};
 use serde::{Deserialize, Serialize};
 use serde_json::Result;
 
@@ -67,7 +67,7 @@ fn sm83_test_data() {
 
 		for test in test_data.iter() {
 
-			println!("Test: {}", test.name);
+			println!("--------Test: {}", test.name);
 
 			for (addr, data) in test.initial_state.ram.iter() {
 				gb.bus.borrow_mut().write_byte(*addr, *data);
@@ -86,28 +86,49 @@ fn sm83_test_data() {
 			gb.cpu.registers.set_8bit_reg(registers::Register8Bit::L, test.initial_state.l);
 
 			gb.cpu.ime = test.initial_state.ime != 0;
-			gb.bus.borrow_mut().write_register(MemRegister::IE, test.initial_state.ie);
+			//gb.bus.borrow_mut().write_register(MemRegister::IE, test.initial_state.ie);
 
+			/*
 			for i in 0..test.cycles.len() {
 				gb.tick();
 			}
+			*/
 
-			assert_eq!(gb.cpu.registers.get_8bit_reg(registers::Register8Bit::A), test.final_state.a, "A comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(registers::Register8Bit::B), test.final_state.b, "B comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(registers::Register8Bit::C), test.final_state.c, "C comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(registers::Register8Bit::D), test.final_state.d, "D comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(registers::Register8Bit::E), test.final_state.e, "E comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(registers::Register8Bit::F), test.final_state.f, "F comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(registers::Register8Bit::H), test.final_state.h, "H comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(registers::Register8Bit::L), test.final_state.l, "L comparison failed");
+			gb.cpu.cycle();
+
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::A), test.final_state.a, "A comparison failed");
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::B), test.final_state.b, "B comparison failed");
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::C), test.final_state.c, "C comparison failed");
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::D), test.final_state.d, "D comparison failed");
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::E), test.final_state.e, "E comparison failed");
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::F), test.final_state.f, "F comparison failed (final: {} actual: {}). Flags: {}{}{}{}",
+				test.final_state.f,
+				gb.cpu.get_8bit_reg(Register8Bit::F),
+				if gb.cpu.registers.get_flag(Flag::Z) { "Z" } else { "_" },
+				if gb.cpu.registers.get_flag(Flag::N) { "N" } else { "_" },
+				if gb.cpu.registers.get_flag(Flag::H) { "H" } else { "_" },
+				if gb.cpu.registers.get_flag(Flag::C) { "C" } else { "_" },
+			);
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::H), test.final_state.h, "H comparison failed (initial: {:x} final: {:x} actual: {:x})",
+				test.initial_state.h,
+				test.final_state.h,
+				gb.cpu.registers.get_8bit_reg(Register8Bit::H),
+			);
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::L), test.final_state.l, "L comparison failed");
 
 			assert_eq!(gb.cpu.pc, test.final_state.pc, "PC comparison failed");
-			assert_eq!(gb.cpu.registers.get_16bit_reg(registers::Register16Bit::SP), test.final_state.sp, "SP comparison failed");
+			assert_eq!(gb.cpu.registers.get_16bit_reg(Register16Bit::SP), test.final_state.sp, "SP comparison failed");
 			assert_eq!(gb.cpu.ime, test.final_state.ime != 0, "IME comparison failed");
 
 			for (addr, data) in test.final_state.ram.iter() {
-				assert_eq!(gb.bus.borrow().read_byte(*addr), *data, "RAM comparison failed")
+				assert_eq!(gb.bus.borrow().read_byte(*addr), *data, "[0x{:x}] RAM comparison failed (final: 0x{:x} actual: 0x{:x})", 
+					*addr,
+					*data, 
+					gb.bus.borrow().read_byte(*addr)
+				);
 			}
+
+			gb.bus.borrow_mut().clear_test_mem();
 
 		}
 
