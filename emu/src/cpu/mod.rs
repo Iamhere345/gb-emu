@@ -189,7 +189,7 @@ impl CPU {
 		self.registers.set_flag(Flag::C, did_overflow);
 		self.registers.set_flag(Flag::N, false);
 		// check if there was an overflow from the 11th bit (0b_0000_1000_0000_0000)
-		self.registers.set_flag(Flag::H, (lhs & 0x800).overflowing_add(rhs & 0x800).0 > 0x800);
+		self.registers.set_flag(Flag::H, (lhs & 0xFFF).overflowing_add(rhs & 0xFFF).0 > 0xFFF);
 		self.registers.set_flag(Flag::Z, new_value == 0);
 
 		new_value
@@ -211,7 +211,7 @@ impl CPU {
 
 		self.registers.set_flag(Flag::C, did_overflow);
 		self.registers.set_flag(Flag::N, true);
-		self.registers.set_flag(Flag::H, (lhs & 0x800).overflowing_sub(rhs & 0x800).0 > 0x800);
+		self.registers.set_flag(Flag::H, (lhs & 0xFFF).overflowing_sub(rhs & 0xFFF).0 < 0xFFF);
 		self.registers.set_flag(Flag::Z, new_value == 0);
 
 		new_value
