@@ -96,25 +96,56 @@ fn sm83_test_data() {
 
 			gb.cpu.cycle();
 
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::A), test.final_state.a, "A comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::B), test.final_state.b, "B comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::C), test.final_state.c, "C comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::D), test.final_state.d, "D comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::E), test.final_state.e, "E comparison failed");
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::F), test.final_state.f, "F comparison failed (final: {} actual: {}). Flags: {}{}{}{}",
-				test.final_state.f,
-				gb.cpu.get_8bit_reg(Register8Bit::F),
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::A), test.final_state.a, "A comparison failed (final: 0x{:x} actual: 0x{:x})",
+				test.final_state.a,
+				gb.cpu.registers.get_8bit_reg(Register8Bit::A)	
+			);
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::B), test.final_state.b, "B comparison failed (final: 0x{:x} actual: 0x{:x})",
+				test.final_state.b,
+				gb.cpu.registers.get_8bit_reg(Register8Bit::B)	
+			);
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::C), test.final_state.c, "C comparison failed (final: 0x{:x} actual: 0x{:x})",
+				test.final_state.c,
+				gb.cpu.registers.get_8bit_reg(Register8Bit::C)	
+			);
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::D), test.final_state.d, "D comparison failed (final: 0x{:x} actual: 0x{:x})",
+				test.final_state.d,
+				gb.cpu.registers.get_8bit_reg(Register8Bit::D)	
+			);
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::E), test.final_state.e, "E comparison failed (final: 0x{:x} actual: 0x{:x})",
+				test.final_state.e,
+				gb.cpu.registers.get_8bit_reg(Register8Bit::E)	
+			);
+
+			let test_flags = {
+				let mut regs = Registers::new();
+				regs.set_8bit_reg(Register8Bit::F, test.final_state.f);
+
+				format!("{}{}{}{}",
+					if regs.get_flag(Flag::Z) { "Z" } else { "_" },
+					if regs.get_flag(Flag::N) { "N" } else { "_" },
+					if regs.get_flag(Flag::H) { "H" } else { "_" },
+					if regs.get_flag(Flag::C) { "C" } else { "_" },
+				)
+
+			};
+
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::F), test.final_state.f, "F comparison failed (final: {} actual: {}{}{}{})",
+				test_flags,
 				if gb.cpu.registers.get_flag(Flag::Z) { "Z" } else { "_" },
 				if gb.cpu.registers.get_flag(Flag::N) { "N" } else { "_" },
 				if gb.cpu.registers.get_flag(Flag::H) { "H" } else { "_" },
 				if gb.cpu.registers.get_flag(Flag::C) { "C" } else { "_" },
 			);
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::H), test.final_state.h, "H comparison failed (initial: {:x} final: {:x} actual: {:x})",
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::H), test.final_state.h, "H comparison failed (initial: 0x{:x} final: 0x{:x} actual: 0x{:x})",
 				test.initial_state.h,
 				test.final_state.h,
 				gb.cpu.registers.get_8bit_reg(Register8Bit::H),
 			);
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::L), test.final_state.l, "L comparison failed");
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::L), test.final_state.l, "L comparison failed (final 0x{:x} actual: 0x{:x})",
+				test.final_state.h,
+				gb.cpu.registers.get_8bit_reg(Register8Bit::L),
+			);
 
 			assert_eq!(gb.cpu.pc, test.final_state.pc, "PC comparison failed");
 			assert_eq!(gb.cpu.registers.get_16bit_reg(Register16Bit::SP), test.final_state.sp, "SP comparison failed");

@@ -1208,6 +1208,7 @@ fn DEC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let new_value = cpu.sub_8bit(old_value, 1);
 	cpu.set_8bit_reg(reg, new_value);
 
+	cpu.registers.set_flag(Flag::N, true);
 	cpu.registers.set_flag(Flag::C, old_carry);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
@@ -1282,18 +1283,19 @@ FLAGS: 0 0 0 C
 fn RLA_RRA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let (new_value, carry): (u8, bool);
-	let is_rla = (opcode & 0x8) >> 3 == 0;
+	let is_rla = (opcode & 0x8) & 1 >> 3 == 0;
 
 	let old_a = cpu.registers.get_8bit_reg(Register8Bit::A);
 
 	if is_rla {
 		// RLA
-		new_value = cpu.registers.get_8bit_reg(Register8Bit::A).rotate_left(1);
-		carry = old_a & 1 == 1;
+		println!("RLA 0x{:x} << 1", old_a);
+		new_value = cpu.registers.get_8bit_reg(Register8Bit::A) << 1;
+		carry = (old_a & 0x80) >> 7 == 1;
 	} else {
 		// RRA
-		new_value = cpu.registers.get_8bit_reg(Register8Bit::A).rotate_right(1);
-		carry = (old_a & 0x80) >> 7 == 1;
+		new_value = cpu.registers.get_8bit_reg(Register8Bit::A) >> 1;
+		carry = old_a & 1 == 1;
 	}
 
 	let old_carry = match is_rla {
@@ -1378,10 +1380,10 @@ fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let is_rl = (opcode >> 3) & 1 == 0;
 
 	if is_rl {
-		new_value = cpu.registers.get_8bit_reg(r8).rotate_left(1);
+		new_value = cpu.registers.get_8bit_reg(r8) << 1;
 		carry = (old_value & 0x80) >> 7 == 1;
 	} else {
-		new_value = cpu.registers.get_8bit_reg(r8).rotate_right(1);
+		new_value = cpu.registers.get_8bit_reg(r8) >> 1;
 		carry = old_value & 1 == 1;
 	}
 
