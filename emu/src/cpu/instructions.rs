@@ -247,7 +247,7 @@ fn DI(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 MNEMONIC: HALT
 OPCODES: 0x76
-DESC: Halts the CPU until and interrupt is serviced
+DESC: Halts the CPU until an interrupt is serviced
 FLAGS: - - - -
 
 */
@@ -344,7 +344,7 @@ fn DAA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let carry = cpu.registers.get_flag(Flag::C);
 	let subtract = cpu.registers.get_flag(Flag::N);
 
-	if (subtract == false && old_value & 0xF > 0x09) || half_carry == false {
+	if (subtract == false && old_value & 0x0F > 0x09) || half_carry == true {
 		offset |= 0x06;
 	}
 
@@ -400,7 +400,7 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	// the offset is fetched every time, even if the jump isn't executed
-	let offset: i8 = get_imm8(cpu) as i8 + 1;
+	let offset: i16 = (get_imm8(cpu) as i8) as i16 + 1;
 
 	if !jump {
 		cpu.pc = cpu.pc.wrapping_add(1);
@@ -411,9 +411,9 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let offset_unsigned: u16 = offset.abs().try_into().unwrap();
 
 	if offset.is_negative() {
-		cpu.pc -= offset_unsigned;
+		cpu.pc = cpu.pc.wrapping_sub(offset_unsigned);
 	} else {
-		cpu.pc += offset_unsigned;
+		cpu.pc = cpu.pc.wrapping_add(offset_unsigned);
 	}
 
 }
@@ -933,7 +933,7 @@ fn LD_A16_SP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 /*
 
-MNEMONIC: ADD A, r8 / ADC A, r8
+MNEMONIC: ADD A, r8/imm8 / ADC A, r8/imm8
 OPCODES: 0x8(0-F)
 DESC: Adds r8 to A
 FLAGS: Z 0 H C
@@ -942,6 +942,13 @@ FLAGS: Z 0 H C
 fn ADD_ADC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let a_value = cpu.get_8bit_reg(Register8Bit::A);
+	let mut carry: u8 = 0;
+
+	if ((opcode & 0x8) != 0 || opcode == 0xCE) && cpu.registers.get_flag(Flag::C) {
+		// add carry bit
+		carry = 1;
+	}
+
 	let rhs_value = match opcode {
 		0xC6 | 0xCE => {
 			get_imm8(cpu)
@@ -952,14 +959,13 @@ fn ADD_ADC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		},
 	};
 
-	let mut new_value = cpu.add_8bit(a_value, rhs_value);
-
-	if ((opcode & 8) != 0 || opcode == 0xCE) && cpu.registers.get_flag(Flag::C) {
-		// add carry bit
-		new_value = cpu.add_8bit(new_value, 1);
-	}
+	let new_value = cpu.add_8bit(a_value, rhs_value.wrapping_add(carry));
 
 	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.registers.set_flag(Flag::C, a_value as u16 + carry as u16 + rhs_value as u16 > 0xFF);
+	cpu.registers.set_flag(Flag::H, (a_value & 0xF) + (carry & 0xF) + (rhs_value & 0xF) > 0xF);
+	cpu.registers.set_flag(Flag::N, false);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
 }
@@ -975,6 +981,13 @@ FLAGS: Z 1 H C
 fn SUB_SBC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let a_value = cpu.get_8bit_reg(Register8Bit::A);
+	let mut carry: u8 = 0;
+
+	if ((opcode & 8) != 0 || opcode == 0xDE) && cpu.registers.get_flag(Flag::C) {
+		// subtract carry bit
+		carry = 1;
+	}
+
 	let rhs_value = match opcode {
 		0xD6 | 0xDE => {
 			*cycles = 8;
@@ -986,27 +999,30 @@ fn SUB_SBC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		},
 	};
 
-	let mut new_value = cpu.sub_8bit(a_value, rhs_value);
+	println!("a: 0x{:x} r8: 0x{:x}", a_value, rhs_value);
 
-	if ((opcode & 8) != 0 || opcode == 0xDE) && cpu.registers.get_flag(Flag::C) {
-		// subtract carry bit
-		new_value = cpu.sub_8bit(new_value, 1);
-	}
+	let mut new_value = cpu.sub_8bit(a_value, rhs_value);
+	new_value = cpu.sub_8bit(new_value, carry);
 
 	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.registers.set_flag(Flag::C, (a_value as u16) < (carry as u16 + rhs_value as u16));
+	cpu.registers.set_flag(Flag::H, (a_value & 0xF) < (rhs_value & 0xF) + carry);
+	cpu.registers.set_flag(Flag::N, true);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
 
-MNEMONIC: AND A, r8
-OPCODES: 0xA(0-7)
+MNEMONIC: AND A, r8 / imm8
+OPCODES: 0xA(0-7), 0xE6
 DESC: Ands r8 with A
-FLAGS: Z - 1 -
+FLAGS: Z 0 1 0
 
 */
 fn AND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
+
 	let a_value = cpu.get_8bit_reg(Register8Bit::A);
 	let rhs_value = match opcode {
 		0xE6 => {
@@ -1019,8 +1035,12 @@ fn AND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		},
 	};
 
+	println!("target: {:?}", Register8Bit::from_r8(opcode & 7));
+
 	let new_value = a_value & rhs_value;
 	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.set_8bit_reg(Register8Bit::F, 0);
 
 	if new_value == 0 {
 		cpu.registers.set_flag(Flag::Z, true);
@@ -1036,7 +1056,7 @@ fn AND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 MNEMONIC: XOR A, r8
 OPCODES: 0xA(0-7)
 DESC: Xors r8 with A
-FLAGS: Z - - -
+FLAGS: Z 0 0 0
 
 */
 fn XOR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
@@ -1055,6 +1075,8 @@ fn XOR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let new_value = a_value ^ rhs_value;
 	cpu.set_8bit_reg(Register8Bit::A, new_value);
 
+	cpu.set_8bit_reg(Register8Bit::F, 0);
+
 	if new_value == 0 {
 		cpu.registers.set_flag(Flag::Z, true);
 	}
@@ -1067,7 +1089,7 @@ fn XOR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 MNEMONIC: OR A, r8
 OPCODES: 0xA(0-7)
 DESC: Ors r8 with A
-FLAGS: Z - - -
+FLAGS: Z 0 0 0
 
 */
 fn OR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
@@ -1085,6 +1107,8 @@ fn OR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let new_value = a_value | rhs_value;
 	cpu.set_8bit_reg(Register8Bit::A, new_value);
+
+	cpu.set_8bit_reg(Register8Bit::F, 0);
 
 	if new_value == 0 {
 		cpu.registers.set_flag(Flag::Z, true);
@@ -1283,13 +1307,12 @@ FLAGS: 0 0 0 C
 fn RLA_RRA(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let (new_value, carry): (u8, bool);
-	let is_rla = (opcode & 0x8) & 1 >> 3 == 0;
+	let is_rla = opcode == 0x17;
 
 	let old_a = cpu.registers.get_8bit_reg(Register8Bit::A);
 
 	if is_rla {
 		// RLA
-		println!("RLA 0x{:x} << 1", old_a);
 		new_value = cpu.registers.get_8bit_reg(Register8Bit::A) << 1;
 		carry = (old_a & 0x80) >> 7 == 1;
 	} else {
@@ -1428,12 +1451,10 @@ fn SLA_SRA_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		// SLA
 		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shl(1);
 		carry = (old_value & 0x80) >> 7 == 1;
-		println!("old: 0x{:x} new: 0x{:x}", old_value, new_value);
 	} else {
 		//SRA
 		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
 		carry = old_value & 1 == 1;
-		println!("SRA?")
 	}
 
 	//? Arithmetic shifts preserve the sign bit (bit 7), doesnt apply to left shift (https://open4tech.com/wp-content/uploads/2016/11/Arithmetic_Shift.jpg)
