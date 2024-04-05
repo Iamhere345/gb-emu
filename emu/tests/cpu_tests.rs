@@ -86,6 +86,7 @@ fn sm83_test_data() {
 			gb.cpu.registers.set_8bit_reg(registers::Register8Bit::L, test.initial_state.l);
 
 			gb.cpu.ime = test.initial_state.ime != 0;
+			gb.cpu.halted = false;
 			//gb.bus.borrow_mut().write_register(MemRegister::IE, test.initial_state.ie);
 
 			/*
@@ -117,7 +118,20 @@ fn sm83_test_data() {
 				gb.cpu.registers.get_8bit_reg(Register8Bit::E)	
 			);
 
-			let test_flags = {
+			let initial_test_flags = {
+				let mut regs = Registers::new();
+				regs.set_8bit_reg(Register8Bit::F, test.initial_state.f);
+
+				format!("{}{}{}{}",
+					if regs.get_flag(Flag::Z) { "Z" } else { "_" },
+					if regs.get_flag(Flag::N) { "N" } else { "_" },
+					if regs.get_flag(Flag::H) { "H" } else { "_" },
+					if regs.get_flag(Flag::C) { "C" } else { "_" },
+				)
+
+			};
+
+			let final_test_flags = {
 				let mut regs = Registers::new();
 				regs.set_8bit_reg(Register8Bit::F, test.final_state.f);
 
@@ -130,8 +144,9 @@ fn sm83_test_data() {
 
 			};
 
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::F), test.final_state.f, "F comparison failed (final: {} actual: {}{}{}{})",
-				test_flags,
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::F), test.final_state.f, "F comparison failed (initial: {} final: {} actual: {}{}{}{})",
+				initial_test_flags,
+				final_test_flags,
 				if gb.cpu.registers.get_flag(Flag::Z) { "Z" } else { "_" },
 				if gb.cpu.registers.get_flag(Flag::N) { "N" } else { "_" },
 				if gb.cpu.registers.get_flag(Flag::H) { "H" } else { "_" },
@@ -147,9 +162,19 @@ fn sm83_test_data() {
 				gb.cpu.registers.get_8bit_reg(Register8Bit::L),
 			);
 
-			assert_eq!(gb.cpu.pc, test.final_state.pc, "PC comparison failed");
-			assert_eq!(gb.cpu.registers.get_16bit_reg(Register16Bit::SP), test.final_state.sp, "SP comparison failed");
-			assert_eq!(gb.cpu.ime, test.final_state.ime != 0, "IME comparison failed");
+			assert_eq!(gb.cpu.pc, test.final_state.pc, "PC comparison failed (initial 0x{:x} final 0x{:x} actual: 0x{:x})",
+				test.initial_state.pc,
+				test.final_state.pc,
+				gb.cpu.pc,
+			);
+			assert_eq!(gb.cpu.registers.get_16bit_reg(Register16Bit::SP), test.final_state.sp, "SP comparison failed (final: 0x{:x} actual 0x{:x})",
+				test.final_state.sp,
+				gb.cpu.registers.get_16bit_reg(Register16Bit::SP),
+			);
+			assert_eq!(gb.cpu.ime, test.final_state.ime != 0, "IME comparison failed (final: {} actual: {})",
+				test.final_state.ime != 0,
+				gb.cpu.ime,
+			);
 
 			for (addr, data) in test.final_state.ram.iter() {
 				assert_eq!(gb.bus.borrow().read_byte(*addr), *data, "[0x{:x}] RAM comparison failed (final: 0x{:x} actual: 0x{:x})", 
