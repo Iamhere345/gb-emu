@@ -8,6 +8,7 @@ use super::CPU;
 use super::registers::*;
 
 #[allow(non_camel_case_types)]
+#[derive(Debug)]
 pub enum Cond {
 	nz,
 	z,
@@ -224,7 +225,7 @@ FLAGS: - - - -
 */
 fn EI(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	// ? accuracy: the effects of EI are delayed by one instruction (important for the halt bug)
-	cpu.ime = true;
+	cpu.ei = 1;
 	
 	cpu.pc = cpu.pc.wrapping_add(1);
 }
@@ -447,7 +448,8 @@ fn JP_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	if !jump {
-		cpu.pc = cpu.pc.wrapping_add(1);
+		// instruction is 3 bytes long
+		cpu.pc = cpu.pc.wrapping_add(3);
 		*cycles = 12;
 		return;
 	}
@@ -498,18 +500,18 @@ fn CALL_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	if !jump {
-		cpu.pc = cpu.pc.wrapping_add(1);
+		// instruction is 3 bytes long
+		cpu.pc = cpu.pc.wrapping_add(3);
 		*cycles = 12;
 		return;
 	}
 
-	// push current address onto the stack
-	let mut target_addr = cpu.dec_sp();
-	cpu.bus.borrow_mut().write_byte(target_addr, (cpu.pc & 0xF) as u8);
-	target_addr = cpu.dec_sp();
-	cpu.bus.borrow_mut().write_byte(target_addr, (cpu.pc >> 4) as u8);
-
 	let new_addr = get_imm16(cpu);
+	cpu.pc = cpu.pc.wrapping_add(1);
+
+	// push current address onto the stack
+	cpu.push16(cpu.pc);
+	
 	cpu.pc = new_addr;
 
 }
@@ -526,12 +528,14 @@ FLAGS: - - - -
 fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let jump: bool;
 
+	// unconditional
 	if (opcode & 1) == 1 {
 		jump = true;
 		// RETI
-	} else if opcode == 0xD9 {
-		jump = true;
-		cpu.ime = true;
+		if opcode == 0xD9 {
+			cpu.ime = true;
+		}
+		// conditional
 	} else {
 		let cond = Cond::new((opcode & 0x18) >> 3);
 
@@ -553,14 +557,9 @@ fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	// pop the return address from the stack
-	let low_byte = cpu.bus.borrow().read_byte(cpu.registers.get_16bit_reg(Register16Bit::SP));
-	let sp = cpu.inc_sp();
-	let hi_byte = cpu.bus.borrow().read_byte(sp);
-	cpu.inc_sp();
+	let new_addr = cpu.pop16();
 
 	// set pc to the return address
-	let new_addr = (hi_byte as u16) << 8 | low_byte as u16;
-	let new_addr = cpu.pop16();
 	cpu.pc = new_addr;
 
 }
@@ -577,7 +576,7 @@ fn RST(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let vec = ((opcode >> 3) & 0x7) * 8;
 
-	cpu.push16(cpu.pc);
+	cpu.push16(cpu.pc.wrapping_add(1));
 
 	cpu.pc = vec as u16;
 }
@@ -814,11 +813,7 @@ FLAGS: - - - -
 fn PUSH_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let target = cpu.registers.get_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3));
 
-	let mut target_addr = cpu.dec_sp();
-	cpu.bus.borrow_mut().write_byte(target_addr, (target & 0xF) as u8);
-
-	target_addr = cpu.dec_sp();
-	cpu.bus.borrow_mut().write_byte(target_addr, (target >> 4) as u8);
+	cpu.push16(target);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
 }
@@ -834,12 +829,8 @@ FLAGS (POP AF): Z N H C
 */
 fn POP_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
-	let low_byte = cpu.bus.borrow().read_byte(cpu.registers.get_16bit_reg(Register16Bit::SP));
-	let sp = cpu.inc_sp();
-	let hi_byte = cpu.bus.borrow().read_byte(sp);
-	cpu.inc_sp();
+	let new_value = cpu.pop16();
 
-	let new_value = (hi_byte as u16) << 8 | low_byte as u16;
 	cpu.registers.set_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3), new_value);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
@@ -894,7 +885,7 @@ fn ADD_SP_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let offset = get_imm8(cpu) as i8;
 
 	let sp_value = cpu.registers.get_16bit_reg(Register16Bit::SP);
-	cpu.registers.set_16bit_reg(Register16Bit::SP, (sp_value as i16 + offset as i16) as u16);
+	cpu.registers.set_16bit_reg(Register16Bit::SP, ((sp_value as i16).wrapping_add(offset as i16)) as u16);
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::H, (sp_value & 0xF) + (offset as u16 & 0xF) > 0xF);
@@ -1364,15 +1355,17 @@ fn RLC_RRC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	if opcode >> 3 == 1 {
 		// RRC
-		new_value = cpu.registers.get_8bit_reg(r8).rotate_right(1);
-		carry = (old_value & 0x80) >> 7 == 1;
+		println!("RRC");
+		new_value = old_value.rotate_right(1);
+		carry = (old_value & 0x01) != 0;
 	} else {
+		println!("RLC");
 		//RLC
-		new_value = cpu.registers.get_8bit_reg(r8).rotate_left(1);
-		carry = old_value & 1 == 1;
+		new_value = old_value.rotate_left(1);
+		carry = (old_value & 0x80) != 0;
 	}
 
-	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+	cpu.set_8bit_reg(r8, new_value);
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::C, carry);
@@ -1403,10 +1396,10 @@ fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let is_rl = (opcode >> 3) & 1 == 0;
 
 	if is_rl {
-		new_value = cpu.registers.get_8bit_reg(r8) << 1;
+		new_value = old_value << 1;
 		carry = (old_value & 0x80) >> 7 == 1;
 	} else {
-		new_value = cpu.registers.get_8bit_reg(r8) >> 1;
+		new_value = old_value >> 1;
 		carry = old_value & 1 == 1;
 	}
 
@@ -1415,11 +1408,11 @@ fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		false => (cpu.registers.get_flag(Flag::C) as u8) << 7
 	};
 
-	cpu.registers.set_8bit_reg(Register8Bit::A, new_value | old_carry);
+	cpu.set_8bit_reg(r8, new_value | old_carry);
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::C, carry);
-	cpu.registers.set_flag(Flag::Z, new_value == 0);
+	cpu.registers.set_flag(Flag::Z, (new_value | old_carry) == 0);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
 
@@ -1445,23 +1438,24 @@ fn SLA_SRA_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		*cycles = 16;
 	}
 
-	let is_sla = (opcode >> 3) & 0x80 == 0;
+	let is_sla = (opcode >> 3) & 0x01 == 0;
 
 	if is_sla {
 		// SLA
-		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shl(1);
+		(new_value, _) = old_value.overflowing_shl(1);
 		carry = (old_value & 0x80) >> 7 == 1;
 	} else {
 		//SRA
-		(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
+		println!("SRA");
+		(new_value, _) = old_value.overflowing_shr(1);
 		carry = old_value & 1 == 1;
 	}
 
 	//? Arithmetic shifts preserve the sign bit (bit 7), doesnt apply to left shift (https://open4tech.com/wp-content/uploads/2016/11/Arithmetic_Shift.jpg)
 	if !is_sla {
-		cpu.registers.set_8bit_reg(r8, new_value | (old_value & 0x80));
+		cpu.set_8bit_reg(r8, new_value | (old_value & 0x80));
 	} else {
-		cpu.registers.set_8bit_reg(r8, new_value);
+		cpu.set_8bit_reg(r8, new_value);
 	}
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
@@ -1518,10 +1512,10 @@ fn SRL_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		*cycles = 16;
 	}
 
-	(new_value, _) = cpu.registers.get_8bit_reg(r8).overflowing_shr(1);
-	carry = (old_value & 0x80) >> 7 == 1;
+	(new_value, _) = old_value.overflowing_shr(1);
+	carry = old_value & 0x01 == 1;
 
-	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
+	cpu.set_8bit_reg(r8, new_value);
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::C, carry);
