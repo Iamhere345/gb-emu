@@ -128,7 +128,7 @@ impl Bus {
 	pub fn read_byte(&self, addr: u16) -> u8 {
 
 		//#[cfg(test)]
-		return self.memory[addr as usize];
+		//return self.memory[addr as usize];
 
 		// TODO replace with cart memory
 		if addr >= ROM_BANK1_START && addr <= ROM_BANK2_END {
