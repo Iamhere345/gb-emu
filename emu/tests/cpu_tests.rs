@@ -1,6 +1,6 @@
 use std::{default, fs};
 
-use emu::{bus::*, Gameboy, cpu::*, cpu::registers::*};
+use emu::{bus::*, cpu::{self, registers::*, *}, Gameboy};
 use serde::{Deserialize, Serialize};
 use serde_json::Result;
 
@@ -57,9 +57,13 @@ fn sm83_test_data() {
 
 	let mut gb = Gameboy::new();
 
-	for entry_res in fs::read_dir("../tests/sm83-test-data").expect("TEST ERROR: unable to read test data") {
-		
+	for (i, entry_res) in fs::read_dir("../tests/sm83-test-data").expect("TEST ERROR: unable to read test data").enumerate() {
+
 		let entry = entry_res.unwrap();
+
+		//if i < 497 {
+			//continue;
+		//}
 
 		let test_str: String = fs::read_to_string(entry.path()).unwrap();
 
@@ -67,7 +71,7 @@ fn sm83_test_data() {
 
 		for test in test_data.iter() {
 
-			println!("--------Test: {}", test.name);
+			println!("--------Test: {} ({})", test.name, i);
 
 			for (addr, data) in test.initial_state.ram.iter() {
 				gb.bus.borrow_mut().write_byte(*addr, *data);
@@ -86,6 +90,7 @@ fn sm83_test_data() {
 			gb.cpu.registers.set_8bit_reg(registers::Register8Bit::L, test.initial_state.l);
 
 			gb.cpu.ime = test.initial_state.ime != 0;
+			gb.cpu.ei = 0;
 			gb.cpu.halted = false;
 			//gb.bus.borrow_mut().write_register(MemRegister::IE, test.initial_state.ie);
 
@@ -97,7 +102,8 @@ fn sm83_test_data() {
 
 			gb.cpu.cycle();
 
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::A), test.final_state.a, "A comparison failed (final: 0x{:x} actual: 0x{:x})",
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::A), test.final_state.a, "A comparison failed (initial: 0x{:x} final: 0x{:x} actual: 0x{:x})",
+				test.initial_state.a,
 				test.final_state.a,
 				gb.cpu.registers.get_8bit_reg(Register8Bit::A)	
 			);
@@ -144,13 +150,15 @@ fn sm83_test_data() {
 
 			};
 
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::F), test.final_state.f, "F comparison failed (initial: {} final: {} actual: {}{}{}{})",
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::F), test.final_state.f, "F comparison failed (initial: {} final: {} actual: {}{}{}{}) final 0x{:x} actual 0x{:x}",
 				initial_test_flags,
 				final_test_flags,
 				if gb.cpu.registers.get_flag(Flag::Z) { "Z" } else { "_" },
 				if gb.cpu.registers.get_flag(Flag::N) { "N" } else { "_" },
 				if gb.cpu.registers.get_flag(Flag::H) { "H" } else { "_" },
 				if gb.cpu.registers.get_flag(Flag::C) { "C" } else { "_" },
+				test.final_state.f,
+				gb.cpu.get_8bit_reg(Register8Bit::F),
 			);
 			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::H), test.final_state.h, "H comparison failed (initial: 0x{:x} final: 0x{:x} actual: 0x{:x})",
 				test.initial_state.h,
@@ -171,7 +179,8 @@ fn sm83_test_data() {
 				test.final_state.sp,
 				gb.cpu.registers.get_16bit_reg(Register16Bit::SP),
 			);
-			assert_eq!(gb.cpu.ime, test.final_state.ime != 0, "IME comparison failed (final: {} actual: {})",
+			assert_eq!(gb.cpu.ime, test.final_state.ime != 0, "IME comparison failed (initial: {} final: {} actual: {})",
+				test.initial_state.ime != 0,
 				test.final_state.ime != 0,
 				gb.cpu.ime,
 			);

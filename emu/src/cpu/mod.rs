@@ -13,6 +13,7 @@ pub struct CPU {
 	pub bus: Rc<RefCell<Bus>>,
 	pub pc: u16,
 	pub ime: bool,			// interrupt master enable
+	pub ei: u8,				// ei instruction executed; wait another cycle before enabling ime
 	pub halted: bool,		// used with the HALT instruction
 	pub wait_cycles: u16,	// used to count the number of cycles left until an instruction has finished
 	pub current_instruction: String,
@@ -27,6 +28,7 @@ impl CPU {
 			bus: bus,
 			pc: 0,
 			ime: false,
+			ei: 0,
 			halted: false,
 			wait_cycles: 0,
 			current_instruction: String::new(),
@@ -36,6 +38,14 @@ impl CPU {
 	pub fn cycle(&mut self) -> bool {
 
 		// TODO check if the amount of cycles for an instruction includes fetching the byte after a prefix and immediates (i think it does)
+
+		// only set ime the after the instruction after ei has been executed
+		if self.ei == 1 {
+			self.ei += 1;
+		} else if self.ei == 2 {
+			self.ei = 0;
+			self.ime = true;
+		}
 
 		let mut byte: u8 = self.bus.borrow().read_byte(self.pc);
 		let prefixed: bool;
@@ -47,7 +57,7 @@ impl CPU {
 			// prefixed instructions
 			prefixed = true;
 
-			self.pc += 1;
+			self.pc = self.pc.wrapping_add(1);
 			byte = self.bus.borrow().read_byte(self.pc);
 
 		} else {
@@ -124,13 +134,15 @@ impl CPU {
 		self.wait_cycles = 25;
 
 	}
-
+	
 	pub fn push16(&mut self, to_push: u16) {
 		let mut target_addr = self.dec_sp();
-		self.bus.borrow_mut().write_byte(target_addr, (to_push & 0xF) as u8);
+		println!("hi: 0x{:X}", (to_push >> 8) as u8);
+		self.bus.borrow_mut().write_byte(target_addr, (to_push >> 8) as u8); // high byte
 
 		target_addr = self.dec_sp();
-		self.bus.borrow_mut().write_byte(target_addr, (to_push >> 4) as u8);
+		println!("lo: 0x{:X}", to_push & 0xFF);
+		self.bus.borrow_mut().write_byte(target_addr, (to_push & 0xFF) as u8); // low byte
 	}
 
 	pub fn pop16(&mut self) -> u16 {

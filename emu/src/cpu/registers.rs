@@ -100,6 +100,11 @@ impl Registers {
 		};
 
 		*reg = set;
+
+		// lower bits of F are hardwired to 0
+		if reg_to_write == Register8Bit::F {
+			*reg &= 0xF0;
+		}
 	}
 
 	pub fn get_16bit_reg(&self, reg: Register16Bit) -> u16 {
@@ -148,8 +153,14 @@ impl Registers {
 			}
 		}
 
-		*hi_reg = ((write & 0xFF00) >> 8) as u8;
+		*hi_reg = (write >> 8) as u8;
 		*lo_reg = (write & 0xFF) as u8;
+
+		// lower bits of F are hardwired to 0
+		if reg == Register16Bit::AF {
+			*lo_reg &= 0xF0;
+		}
+
 	}
 
 	pub fn get_flag(&self, flag: Flag) -> bool {
