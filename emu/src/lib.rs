@@ -38,7 +38,7 @@ impl Gameboy {
 			self.bus.borrow_mut().write_byte(i.try_into().unwrap(), *byte)
 		}
 
-		self.cpu.pc = 0x100;
+		self.cpu.pc = 0xFF;
 
 		// temp
 		/*
