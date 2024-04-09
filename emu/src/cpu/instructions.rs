@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
+use std::fmt::format;
 use std::vec;
 
 use lazy_static::lazy_static;
@@ -41,6 +42,10 @@ pub fn get_imm16(cpu: &mut CPU) -> u16 {
 	let hi_byte = cpu.bus.borrow().read_byte(cpu.pc);
 
 	((hi_byte as u16) << 8) | lo_byte as u16
+}
+
+fn set_debug_str(cpu: &mut CPU, from: &str, to: String) {
+	cpu.current_instruction = cpu.current_instruction.replace(from, to.as_str());
 }
 
 pub struct Instruction {
@@ -143,7 +148,6 @@ lazy_static!{
 		Instruction::new(vec![0xEE], 8, "XOR A, n8", XOR),
 		Instruction::new(vec![0xF6], 8, "OR A, n8", OR),
 		Instruction::new(vec![0xFE], 8, "CP A, n8", CP),
-
 
 		Instruction::new(vec![0x03, 0x13, 0x23, 0x33], 8, "INC r16", INC_R16),
 		Instruction::new(vec![0x0B, 0x1B, 0x2B, 0x3B], 8, "DEC r16", DEC_R16),
@@ -386,6 +390,7 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	if (opcode >> 3) == 3 {
 		jump = true;
+		set_debug_str(cpu, "(cond),", "".to_string());
 	} else {
 		let cond = Cond::new((opcode & 0x18) >> 3);
 
@@ -398,10 +403,16 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 			Cond::nc => if !c 	{ jump = true; } else { jump = false; },
 			Cond::c => 	if c 	{ jump = true; } else { jump = false; }
 		}
+
+		set_debug_str(cpu, "(cond)", format!("{:?}", cond));
 	}
 
 	// the offset is fetched every time, even if the jump isn't executed
-	let offset: i16 = (get_imm8(cpu) as i8) as i16 + 1;
+	let offset: i8 = get_imm8(cpu) as i8;
+
+	set_debug_str(cpu, "e8", format!("{}", offset));
+
+	let new_pc: u16 = (((cpu.pc + 1) as i16) + offset as i16) as u16;
 
 	if !jump {
 		cpu.pc = cpu.pc.wrapping_add(1);
@@ -409,6 +420,9 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		return;
 	}
 
+	cpu.pc = new_pc;
+
+	/*
 	let offset_unsigned: u16 = offset.abs().try_into().unwrap();
 
 	if offset.is_negative() {
@@ -416,6 +430,7 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	} else {
 		cpu.pc = cpu.pc.wrapping_add(offset_unsigned);
 	}
+	*/
 
 }
 
@@ -433,8 +448,11 @@ fn JP_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	if (opcode & 1) == 1 {
 		jump = true;
+		set_debug_str(cpu, "(cond),", "".to_string());
 	} else {
 		let cond = Cond::new((opcode & 0x18) >> 3);
+
+		set_debug_str(cpu, "(cond)", format!("{:?}", cond));
 
 		let z = cpu.registers.get_flag(Flag::Z);
 		let c = cpu.registers.get_flag(Flag::C);
@@ -455,6 +473,9 @@ fn JP_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	let new_addr = get_imm16(cpu);
+
+	set_debug_str(cpu, "a16", format!("0x{:X}", new_addr));
+
 	cpu.pc = new_addr;
 
 }
@@ -485,8 +506,11 @@ fn CALL_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	if (opcode & 1) == 1 {
 		jump = true;
+		set_debug_str(cpu, "(cond),", "".to_string());
 	} else {
 		let cond = Cond::new((opcode & 0x18) >> 3);
+
+		set_debug_str(cpu, "(cond)", format!("{:?}", cond));
 
 		let z = cpu.registers.get_flag(Flag::Z);
 		let c = cpu.registers.get_flag(Flag::C);
@@ -507,6 +531,9 @@ fn CALL_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	let new_addr = get_imm16(cpu);
+
+	set_debug_str(cpu, "a16", format!("0x{:X}", new_addr));
+
 	cpu.pc = cpu.pc.wrapping_add(1);
 
 	// push current address onto the stack
@@ -531,6 +558,8 @@ fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	// unconditional
 	if (opcode & 1) == 1 {
 		jump = true;
+		set_debug_str(cpu, "(cond),", "".to_string());
+
 		// RETI
 		if opcode == 0xD9 {
 			cpu.ime = true;
@@ -538,6 +567,8 @@ fn RET_COND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		// conditional
 	} else {
 		let cond = Cond::new((opcode & 0x18) >> 3);
+
+		set_debug_str(cpu, "(cond)", format!("{:?}", cond));
 
 		let z = cpu.registers.get_flag(Flag::Z);
 		let c = cpu.registers.get_flag(Flag::C);
@@ -576,6 +607,8 @@ fn RST(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let vec = ((opcode >> 3) & 0x7) * 8;
 
+	set_debug_str(cpu, "vec", format!("0x{:X}", vec));
+
 	cpu.push16(cpu.pc.wrapping_add(1));
 
 	cpu.pc = vec as u16;
@@ -594,6 +627,9 @@ FLAGS: - - - -
 fn LD_R8_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let src = Register8Bit::from_r8(opcode & 7);
 	let dst = Register8Bit::from_r8((opcode >> 3) & 7);
+
+	set_debug_str(cpu, "r8,", format!("{:?},", src));
+	set_debug_str(cpu, ", r8", format!(", {:?}", src));
 
 	let value = cpu.get_8bit_reg(src);
 	cpu.set_8bit_reg(dst, value);
@@ -615,14 +651,10 @@ FLAGS: - - - -
 */
 fn LD_R16_IMM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let dest = Register16Bit::from_r16(opcode >> 4);
+	let src = get_imm16(cpu);
 
-	cpu.pc = cpu.pc.wrapping_add(1);
-	let lo_src = cpu.bus.borrow().read_byte(cpu.pc);
-
-	cpu.pc = cpu.pc.wrapping_add(1);
-	let hi_src = cpu.bus.borrow().read_byte(cpu.pc);
-
-	let src: u16 = ((hi_src as u16) << 8) | lo_src as u16;
+	set_debug_str(cpu, "r16", format!("{:?}", dest));
+	set_debug_str(cpu, "imm16", format!("0x{:X}", src));
 
 	cpu.registers.set_16bit_reg(dest, src);
 
@@ -640,9 +672,10 @@ FLAGS: - - - -
 */
 fn LD_R8_IMM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let dest = Register8Bit::from_r8(opcode >> 3);
+	let src = get_imm8(cpu);
 
-	cpu.pc = cpu.pc.wrapping_add(1);
-	let src = cpu.bus.borrow().read_byte(cpu.pc);
+	set_debug_str(cpu, "r8", format!("{:?}", dest));
+	set_debug_str(cpu, "imm8", format!("0x{:X}", src));
 
 	cpu.set_8bit_reg(dest, src);
 
@@ -662,6 +695,8 @@ fn LD_R16MEM_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	
 	let dest_info = Register16Bit::from_r16mem(opcode >> 4);
 	let dest = cpu.registers.get_16bit_reg(dest_info.0);
+
+	set_debug_str(cpu, "r16mem", format!("{:?}", dest_info.0));
 
 	cpu.bus.borrow_mut().write_byte(dest, cpu.registers.get_8bit_reg(Register8Bit::A));
 
@@ -686,6 +721,8 @@ fn LD_A_R16MEM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let src_info = Register16Bit::from_r16mem(opcode >> 4);
 	let src = cpu.registers.get_16bit_reg(src_info.0);
 
+	set_debug_str(cpu, "r16mem", format!("{:?}", src_info.0));
+
 	let new_a = cpu.bus.borrow().read_byte(src);
 
 	cpu.set_8bit_reg(Register8Bit::A, new_a);
@@ -709,6 +746,8 @@ fn LD_A_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let addr = get_imm16(cpu);
 	let new_value = cpu.bus.borrow().read_byte(addr);
 
+	set_debug_str(cpu, "a16", format!("0x{:X}", addr));
+
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
@@ -726,6 +765,8 @@ fn LD_A16_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let addr = get_imm16(cpu);
 	let a_value = cpu.registers.get_8bit_reg(Register8Bit::A);
 
+	set_debug_str(cpu, "a16", format!("0x{:X}", addr));
+
 	cpu.bus.borrow_mut().write_byte(addr, a_value);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
@@ -740,9 +781,11 @@ FLAGS: - - - -
 
 */
 fn LDH_A_A8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
-
 	let addr: u16 = 0xFF00 + get_imm8(cpu) as u16;
 	let new_value = cpu.bus.borrow().read_byte(addr);
+
+	set_debug_str(cpu, "a8", format!("0x{:X}", addr));
+
 	cpu.registers.set_8bit_reg(Register8Bit::A, new_value);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
@@ -757,9 +800,10 @@ FLAGS: - - - -
 
 */
 fn LDH_A8_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
-
 	let a_value = cpu.registers.get_8bit_reg(Register8Bit::A);
 	let addr: u16 = 0xFF00 + get_imm8(cpu) as u16;
+
+	set_debug_str(cpu, "a8", format!("0x{:X}", addr));
 
 	cpu.bus.borrow_mut().write_byte(addr, a_value);
 
@@ -804,7 +848,7 @@ fn LDH_C_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 /*
 
-MNEMONIC: PUSH r16stk
+MNEMONIC: PUSH r16
 OPCODES: 0x(C-F)5
 DESC: Pushes r16 onto the stack
 FLAGS: - - - -
@@ -812,6 +856,8 @@ FLAGS: - - - -
 */
 fn PUSH_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let target = cpu.registers.get_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3));
+
+	set_debug_str(cpu, "r16", format!("{:?}", Register16Bit::from_r16stk((opcode >> 4) & 3)));
 
 	cpu.push16(target);
 
@@ -828,10 +874,10 @@ FLAGS (POP AF): Z N H C
 
 */
 fn POP_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
-
 	let new_value = cpu.pop16();
-
 	cpu.registers.set_16bit_reg(Register16Bit::from_r16stk((opcode >> 4) & 3), new_value);
+
+	set_debug_str(cpu, "r16", format!("{:?}", Register16Bit::from_r16stk((opcode >> 4) & 3)));
 
 	cpu.pc = cpu.pc.wrapping_add(1);
 }
@@ -863,6 +909,8 @@ fn LD_HL_SP_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let sp_value = cpu.registers.get_16bit_reg(Register16Bit::SP);
 	let offset: i8 = get_imm8(cpu) as i8;
 
+	set_debug_str(cpu, "e8", format!("0x{:X}", offset));
+
 	cpu.registers.set_16bit_reg(Register16Bit::HL, ((cpu.registers.get_16bit_reg(Register16Bit::SP) as i16) + offset as i16) as u16);
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
@@ -884,6 +932,8 @@ fn ADD_SP_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	
 	let offset = get_imm8(cpu) as i8;
 
+	set_debug_str(cpu, "e8", format!("0x{:X}", offset));
+
 	let sp_value = cpu.registers.get_16bit_reg(Register16Bit::SP);
 	cpu.registers.set_16bit_reg(Register16Bit::SP, ((sp_value as i16).wrapping_add(offset as i16)) as u16);
 
@@ -903,13 +953,9 @@ FLAGS: - - - -
 
 */
 fn LD_A16_SP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
-	cpu.pc = cpu.pc.wrapping_add(1);
-	let lo_addr = cpu.bus.borrow().read_byte(cpu.pc);
+	let addr = get_imm16(cpu);
 
-	cpu.pc = cpu.pc.wrapping_add(1);
-	let hi_addr = cpu.bus.borrow().read_byte(cpu.pc);
-
-	let addr: u16 = ((hi_addr as u16) << 8) | lo_addr as u16;
+	set_debug_str(cpu, "e8", format!("0x{:X}", addr));
 
 	let sp = cpu.registers.get_16bit_reg(Register16Bit::SP);
 	cpu.bus.borrow_mut().write_byte(addr, (sp & 0xFF) as u8);
@@ -942,13 +988,22 @@ fn ADD_ADC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let rhs_value = match opcode {
 		0xC6 | 0xCE => {
-			get_imm8(cpu)
+			let rhs = get_imm8(cpu);
+			set_debug_str(cpu, "imm8", format!("0x{:X}", rhs));
+
+			rhs
 		},
 		_ => {
-			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
-			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+			let r8 = Register8Bit::from_r8(opcode & 7);
+			if r8 == Register8Bit::HL { *cycles = 8; }
+
+			set_debug_str(cpu, "r8", format!("{:?}", r8));
+
+			cpu.get_8bit_reg(r8)
 		},
 	};
+
+	
 
 	let new_value = cpu.add_8bit(a_value, rhs_value.wrapping_add(carry));
 
@@ -963,7 +1018,7 @@ fn ADD_ADC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 /*
 
-MNEMONIC: SUB A, r8 / SBC A, r8
+MNEMONIC: SUB A, r8/imm8 / SBC A, r8/imm8
 OPCODES: 0x8(0-F)
 DESC: Subtracts r8 from A
 FLAGS: Z 1 H C
@@ -982,15 +1037,21 @@ fn SUB_SBC(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let rhs_value = match opcode {
 		0xD6 | 0xDE => {
 			*cycles = 8;
-			get_imm8(cpu)
+
+			let rhs = get_imm8(cpu);
+			set_debug_str(cpu, "imm8", format!("0x{:X}", rhs));
+			
+			rhs
 		},
 		_ => {
-			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
-			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+			let r8 = Register8Bit::from_r8(opcode & 7);
+			if r8 == Register8Bit::HL { *cycles = 8; }
+
+			set_debug_str(cpu, "r8", format!("{:?}", r8));
+
+			cpu.get_8bit_reg(r8)
 		},
 	};
-
-	println!("a: 0x{:x} r8: 0x{:x}", a_value, rhs_value);
 
 	let mut new_value = cpu.sub_8bit(a_value, rhs_value);
 	new_value = cpu.sub_8bit(new_value, carry);
@@ -1018,11 +1079,19 @@ fn AND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let rhs_value = match opcode {
 		0xE6 => {
 			*cycles = 8;
-			get_imm8(cpu)
+
+			let rhs = get_imm8(cpu);
+			set_debug_str(cpu, "imm8", format!("0x{:X}", rhs));
+			
+			rhs
 		},
 		_ => {
-			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
-			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+			let r8 = Register8Bit::from_r8(opcode & 7);
+			if r8 == Register8Bit::HL { *cycles = 8; }
+
+			set_debug_str(cpu, "r8", format!("{:?}", r8));
+
+			cpu.get_8bit_reg(r8)
 		},
 	};
 
@@ -1055,11 +1124,19 @@ fn XOR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let rhs_value = match opcode {
 		0xEE => {
 			*cycles = 8;
-			get_imm8(cpu)
+
+			let rhs = get_imm8(cpu);
+			set_debug_str(cpu, "imm8", format!("0x{:X}", rhs));
+			
+			rhs
 		},
 		_ => {
-			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
-			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+			let r8 = Register8Bit::from_r8(opcode & 7);
+			if r8 == Register8Bit::HL { *cycles = 8; }
+
+			set_debug_str(cpu, "r8", format!("{:?}", r8));
+
+			cpu.get_8bit_reg(r8)
 		},
 	};
 
@@ -1088,11 +1165,19 @@ fn OR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let rhs_value = match opcode {
 		0xF6 => {
 			*cycles = 8;
-			get_imm8(cpu)
+
+			let rhs = get_imm8(cpu);
+			set_debug_str(cpu, "imm8", format!("0x{:X}", rhs));
+			
+			rhs
 		},
 		_ => {
-			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
-			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+			let r8 = Register8Bit::from_r8(opcode & 7);
+			if r8 == Register8Bit::HL { *cycles = 8; }
+
+			set_debug_str(cpu, "r8", format!("{:?}", r8));
+
+			cpu.get_8bit_reg(r8)
 		},
 	};
 
@@ -1122,11 +1207,19 @@ fn CP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let rhs_value = match opcode {
 		0xFE => {
 			*cycles = 8;
-			get_imm8(cpu)
+
+			let rhs = get_imm8(cpu);
+			set_debug_str(cpu, "imm8", format!("0x{:X}", rhs));
+			
+			rhs
 		},
 		_ => {
-			if Register8Bit::from_r8(opcode & 7) == Register8Bit::HL { *cycles = 8; }
-			cpu.get_8bit_reg(Register8Bit::from_r8(opcode & 7))
+			let r8 = Register8Bit::from_r8(opcode & 7);
+			if r8 == Register8Bit::HL { *cycles = 8; }
+
+			set_debug_str(cpu, "r8", format!("{:?}", r8));
+
+			cpu.get_8bit_reg(r8)
 		},
 	};
 
@@ -1146,6 +1239,7 @@ FLAGS: - - - -
 fn INC_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	
 	let reg = Register16Bit::from_r16(opcode >> 4);
+	set_debug_str(cpu, "r16", format!("{:?}", reg));
 
 	let old_flags = cpu.registers.get_8bit_reg(Register8Bit::F);
 
@@ -1169,6 +1263,7 @@ FLAGS: - - - -
 fn DEC_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let reg = Register16Bit::from_r16(opcode >> 4);
+	set_debug_str(cpu, "r16", format!("{:?}", reg));
 
 	let old_flags = cpu.registers.get_8bit_reg(Register8Bit::F);
 
@@ -1192,6 +1287,7 @@ FLAGS: Z 0 H -
 fn INC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let reg = Register8Bit::from_r8(opcode >> 3);
+	set_debug_str(cpu, "r8", format!("{:?}", reg));
 
 	let old_carry = cpu.registers.get_flag(Flag::C);
 
@@ -1216,6 +1312,7 @@ FLAGS: Z 1 H -
 fn DEC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let reg = Register8Bit::from_r8(opcode >> 3);
+	set_debug_str(cpu, "r8", format!("{:?}", reg));
 
 	let old_carry = cpu.registers.get_flag(Flag::C);
 
@@ -1242,6 +1339,8 @@ fn ADD_HL_R16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let lhs = cpu.registers.get_16bit_reg(Register16Bit::HL);
 	let rhs = cpu.registers.get_16bit_reg(Register16Bit::from_r16(opcode >> 4));
+
+	set_debug_str(cpu, "r16", format!("{:?}", rhs));
 
 	let old_z = cpu.registers.get_flag(Flag::Z);
 
@@ -1345,6 +1444,8 @@ fn RLC_RRC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
 
+	set_debug_str(cpu, "r8", format!("{:?}", r8));
+
 	let old_value = cpu.get_8bit_reg(r8);
 
 	if r8 == Register8Bit::HL {
@@ -1385,6 +1486,8 @@ FLAGS: Z 0 0 C
 fn RL_RR_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
+
+	set_debug_str(cpu, "r8", format!("{:?}", r8));
 
 	if r8 == Register8Bit::HL {
 		*cycles = 16;
@@ -1431,6 +1534,8 @@ fn SLA_SRA_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let (new_value, carry): (u8, bool);
 
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
+
+	set_debug_str(cpu, "r8", format!("{:?}", r8));
 
 	let old_value = cpu.get_8bit_reg(r8);
 
@@ -1479,6 +1584,8 @@ fn SWAP_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
 	let old_value = cpu.get_8bit_reg(r8);
 
+	set_debug_str(cpu, "r8", format!("{:?}", r8));
+
 	if r8 == Register8Bit::HL {
 		*cycles = 16;
 	}
@@ -1505,6 +1612,7 @@ fn SRL_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let (new_value, carry): (u8, bool);
 
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
+	set_debug_str(cpu, "r8", format!("{:?}", r8));
 
 	let old_value = cpu.get_8bit_reg(r8);
 
@@ -1537,6 +1645,9 @@ fn BIT_U3_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
 	let u3 = (opcode >> 3) & 0x7;
 
+	set_debug_str(cpu, "r8", format!("{:?}", r8));
+	set_debug_str(cpu, "u3", format!("{}", u3));
+
 	if r8 == Register8Bit::HL {
 		*cycles = 12;
 	}
@@ -1563,6 +1674,9 @@ fn RES_U3_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
 	let u3 = (opcode >> 3) & 0x7;
 
+	set_debug_str(cpu, "r8", format!("{:?}", r8));
+	set_debug_str(cpu, "u3", format!("{}", u3));
+
 	if r8 == Register8Bit::HL {
 		*cycles = 16;
 	}
@@ -1586,6 +1700,9 @@ fn SET_U3_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	let r8 = Register8Bit::from_r8(opcode & 0x7);
 	let u3 = (opcode >> 3) & 0x7;
+
+	set_debug_str(cpu, "r8", format!("{:?}", r8));
+	set_debug_str(cpu, "u3", format!("{}", u3));
 
 	if r8 == Register8Bit::HL {
 		*cycles = 16;

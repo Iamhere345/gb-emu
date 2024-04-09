@@ -154,8 +154,8 @@ impl Bus {
 
 	pub fn write_byte(&mut self, addr: u16, write: u8) {
 
-		self.memory[addr as usize] = write;
-		return;
+		//self.memory[addr as usize] = write;
+		//return;
 
 		if addr >= ROM_BANK1_START && addr <= ROM_BANK2_END {
 			self.memory[addr as usize] = write;

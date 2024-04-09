@@ -11,7 +11,7 @@ pub enum Register8Bit {
 	HL	// [HL] - only used as an identifier - cannot be accessed or modified by get_8bit_reg() or set_8bit_reg()
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Register16Bit {
 	AF,
 	BC,

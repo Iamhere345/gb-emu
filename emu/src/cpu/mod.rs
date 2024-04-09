@@ -72,13 +72,13 @@ impl CPU {
 				for opcode in instruction.opcodes.iter() {
 					if byte == *opcode {
 
-						println!("[0x{:x}][0x{:x}] {}", self.pc, byte, instruction.mnemonic);
-
 						self.current_instruction = instruction.mnemonic.to_string();
 
 						let mut cycles = instruction.cycles;
-
+						
 						(instruction.exec)(self, byte, &mut cycles);
+						
+						println!("[0x{:x}][0x{:x}] {}", self.pc, byte, self.current_instruction);
 
 						self.wait_cycles = cycles;
 						executed = true;
