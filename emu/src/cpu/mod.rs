@@ -2,6 +2,7 @@ pub mod registers;
 mod instructions;
 
 use crate::bus::*;
+use crate::interrupt::*;
 use self::registers::*;
 use self::instructions::*;
 
@@ -37,22 +38,12 @@ impl CPU {
 
 	pub fn cycle(&mut self) -> bool {
 
-		// TODO check if the amount of cycles for an instruction includes fetching the byte after a prefix and immediates (i think it does)
-
-		// only set ime the after the instruction after ei has been executed
-		if self.ei == 1 {
-			self.ei += 1;
-		} else if self.ei == 2 {
-			self.ei = 0;
-			self.ime = true;
-		}
-
 		let mut byte: u8 = self.bus.borrow().read_byte(self.pc);
 		let prefixed: bool;
 
 		if byte == 0xCB {
 
-			println!("[0x{:x}] prefixed 0xCB", self.pc);
+			//println!("[0x{:x}] prefixed 0xCB", self.pc);
 
 			// prefixed instructions
 			prefixed = true;
@@ -78,7 +69,7 @@ impl CPU {
 						
 						(instruction.exec)(self, byte, &mut cycles);
 						
-						println!("[0x{:x}][0x{:x}] {}", self.pc, byte, self.current_instruction);
+						//println!("[0x{:x}][0x{:x}] {}", self.pc, byte, self.current_instruction);
 
 						self.wait_cycles = cycles;
 						executed = true;
@@ -87,14 +78,27 @@ impl CPU {
 					}
 				}
 			}
+
+			if !executed {
+				panic!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
+			}
+
 		}
 
-		if !executed {
-			println!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
-		}
 		
+
+		// only set ime the after the instruction after ei has been executed
+		self.ei = match self.ei {
+			1 => 2,
+			2 => {
+				self.ime = true;
+				0
+			},
+			_ => 0
+		};
+
 		// check for interrupts
-		if self.ime {
+		if self.ime || self.halted {
 			let if_flags = self.bus.borrow().read_register(MemRegister::IF);
 			let ie_flags = self.bus.borrow().read_register(MemRegister::IE);
 
@@ -121,10 +125,18 @@ impl CPU {
 		// assumes the corresponding IE bit is true
 		// interrupts are checked before the next instruction is executed
 
-		if self.halted { self.halted = false; }
+		//println!("INTERRUPT (last instruction: {})", self.current_instruction);
 
-		let new_if = self.bus.borrow().read_register(MemRegister::IF) & flag as u8;
+		if self.halted { 
+			self.halted = false;
+
+			return
+		}
+		
+		// clear the bit in IF
+		let new_if = self.bus.borrow().read_register(MemRegister::IF) & !(flag as u8);
 		self.bus.borrow_mut().write_register(MemRegister::IF, new_if);
+
 
 		self.ime = false;
 
@@ -137,11 +149,9 @@ impl CPU {
 	
 	pub fn push16(&mut self, to_push: u16) {
 		let mut target_addr = self.dec_sp();
-		println!("hi: 0x{:X}", (to_push >> 8) as u8);
 		self.bus.borrow_mut().write_byte(target_addr, (to_push >> 8) as u8); // high byte
 
 		target_addr = self.dec_sp();
-		println!("lo: 0x{:X}", to_push & 0xFF);
 		self.bus.borrow_mut().write_byte(target_addr, (to_push & 0xFF) as u8); // low byte
 	}
 

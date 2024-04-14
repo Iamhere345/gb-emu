@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
-use std::fmt::format;
 use std::vec;
 
 use lazy_static::lazy_static;
@@ -229,8 +228,9 @@ FLAGS: - - - -
 */
 fn EI(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	// ? accuracy: the effects of EI are delayed by one instruction (important for the halt bug)
-	cpu.ei = 1;
-	
+	//cpu.ei = 1;
+	cpu.ime = true;
+
 	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
@@ -258,6 +258,8 @@ FLAGS: - - - -
 */
 fn HALT(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
+	// TODO halt bug
+
 	cpu.halted = true;
 
 	cpu.pc = cpu.pc.wrapping_add(1);
@@ -272,7 +274,9 @@ FLAGS: - - - -
 
 */
 fn STOP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
-	println!("!!! STOP INSTRUCTION IS UNIMPLEMENTED !!!");
+	//println!("!!! STOP INSTRUCTION IS UNIMPLEMENTED !!!");
+
+	cpu.pc = cpu.pc.wrapping_add(1);
 }
 
 /*
@@ -728,7 +732,7 @@ fn LD_A_R16MEM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	cpu.set_8bit_reg(Register8Bit::A, new_a);
 
 	// postinc or postdec
-	cpu.registers.set_16bit_reg(src_info.0, (src as i16 + src_info.1 as i16) as u16);
+	cpu.registers.set_16bit_reg(src_info.0, ((src as i16).wrapping_add(src_info.1 as i16)) as u16);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
 
@@ -911,7 +915,7 @@ fn LD_HL_SP_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	set_debug_str(cpu, "e8", format!("0x{:X}", offset));
 
-	cpu.registers.set_16bit_reg(Register16Bit::HL, ((cpu.registers.get_16bit_reg(Register16Bit::SP) as i16) + offset as i16) as u16);
+	cpu.registers.set_16bit_reg(Register16Bit::HL, ((cpu.registers.get_16bit_reg(Register16Bit::SP) as i16).wrapping_add(offset as i16)) as u16);
 
 	cpu.registers.set_8bit_reg(Register8Bit::F, 0);
 	cpu.registers.set_flag(Flag::H, (sp_value & 0xF) + (offset as u16 & 0xF) > 0xF);
@@ -1094,8 +1098,6 @@ fn AND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 			cpu.get_8bit_reg(r8)
 		},
 	};
-
-	println!("target: {:?}", Register8Bit::from_r8(opcode & 7));
 
 	let new_value = a_value & rhs_value;
 	cpu.set_8bit_reg(Register8Bit::A, new_value);
@@ -1456,11 +1458,9 @@ fn RLC_RRC_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	if opcode >> 3 == 1 {
 		// RRC
-		println!("RRC");
 		new_value = old_value.rotate_right(1);
 		carry = (old_value & 0x01) != 0;
 	} else {
-		println!("RLC");
 		//RLC
 		new_value = old_value.rotate_left(1);
 		carry = (old_value & 0x80) != 0;
@@ -1551,7 +1551,6 @@ fn SLA_SRA_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		carry = (old_value & 0x80) >> 7 == 1;
 	} else {
 		//SRA
-		println!("SRA");
 		(new_value, _) = old_value.overflowing_shr(1);
 		carry = old_value & 1 == 1;
 	}

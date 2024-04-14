@@ -10,11 +10,13 @@ use std::fs::File;
 
 pub mod cpu;
 pub mod bus;
+pub mod interrupt;
+pub mod timer;
 
 pub struct Gameboy {
-	pub cpu: CPU,
 	pub bus: Rc<RefCell<Bus>>,
-	pub cycles: u64,
+	pub cpu: CPU,
+	pub cycles: u64,	// clock cycles in T-states
 }
 
 impl Gameboy {
@@ -72,7 +74,7 @@ impl Gameboy {
 
 	pub fn tick(&mut self, /*log: &mut BufWriter<File>*/) {
 
-		
+		self.bus.borrow_mut().timer.tick(4);
 
 		self.cycles += 4;
 
