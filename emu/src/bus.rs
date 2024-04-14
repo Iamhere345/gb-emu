@@ -1,39 +1,20 @@
-use super::cpu::CPU;
+use std::cell::{Ref, RefCell};
+use std::rc::Rc;
+
+use super::timer::Timer;
+use super::interrupt::Interrupt;
 
 // possible off-by-one error
 const ROM_BANK1_START: 		u16	= 0x0;
 const ROM_BANK1_END: 		u16	= 0x3FFF;
 
-const ROM_BANK2_START: 		u16 = 0x4000;
 const ROM_BANK2_END: 		u16 = 0x7FFF;
-
-const VRAM_START: 			u16	= 0x8000;
-const VRAM_END:				u16	= 0x9FFF;
-
-const EXTERNAL_RAM_START:	u16	= 0xA000;
-const EXTERNAL_RAM_END:		u16	= 0xBFFF;
 
 const WRAM_START:			u16	= 0xC000;
 const WRAM_END:				u16	= 0xDFFF;
 
-const ECHO_RAM_START:		u16	= 0xE000;
-const ECHO_RAM_END:			u16	= 0xFDFF;
-
-const OAM_START:			u16	= 0xFE00;
-const OAM_END:				u16	= 0xFE9F;
-
-const VOID_START:			u16	= 0xFEA0;
-const VOID_END:				u16	= 0xFEFF;
-
-const IO_START:				u16	= 0xFF00;
-const IO_END:				u16	= 0xFF7F;
-
 const HRAM_START:			u16	= 0xFF80;
 const HRAM_END:				u16	= 0xFFFE;
-
-// OBOE right here i think. i might have to add - 1 to all the end values
-const IE_START:				u16	= 0xFFFE;
-const IE_END:				u16	= 0xFFFF;
 
 pub enum MemRegister {
 	IE = 0xFFFF,		// interrupt enable
@@ -42,60 +23,15 @@ pub enum MemRegister {
 	// TODO add other registers as they as needed
 }
 
-
-// used for setting bits in IE and IF
-#[derive(Copy, Clone)]
-pub enum InterruptFlag {
-	VBlank = 1 << 0,
-	LCDC = 1 << 1,
-	Timer = 1 << 2,
-	Serial = 1 << 3,
-	Joypad = 1 << 4,
-}
-
-impl InterruptFlag {
-	pub fn from_u8(from: u8) -> Self {
-		match from {
-			1 => Self::VBlank,
-			2 => Self::LCDC,
-			4 => Self::Timer,
-			8 => Self::Serial,
-			16 => Self::Joypad,
-			_ => panic!("invalid interrupt flag")
-		}
-	}
-}
-
-pub enum InterruptSource {
-	VBlank = 0x40,
-	LCDC = 0x48,
-	Timer = 0x50,
-	Serial = 0x58,
-	Joypad = 0x60
-}
-
-impl InterruptSource {
-	pub fn from_flag(from: InterruptFlag) -> Self {
-		match from {
-			InterruptFlag::VBlank => Self::VBlank,
-			InterruptFlag::LCDC => Self::LCDC,
-			InterruptFlag::Timer => Self::Timer,
-			InterruptFlag::Serial => Self::Serial,
-			InterruptFlag::Joypad => Self::Joypad
-		}
-	}
-}
-
 #[allow(dead_code)]
 pub struct Bus {
-	// devices on the bus
-	// TODO rom bank switching
-	// these are probably just going to be placeholders until the i write actual devices populate the bus
-
 	memory: [u8; 64 * 1024],
 
-	wram: [u8; (WRAM_END - WRAM_START) as usize],
-	hram: [u8; (HRAM_END - HRAM_START) as usize],
+	pub intf: Rc<RefCell<Interrupt>>,
+	pub timer: Timer,
+
+	wram: [u8; 0x8000],
+	hram: [u8; 0x7F],
 
 	/*
 	rom_bank1: 		[u8; ROM_BANK1_END],							// fixed ROM bank from the cart
@@ -116,39 +52,33 @@ impl Bus {
 
 	pub fn new() -> Self {
 
+		let intf = Rc::new(RefCell::new(Interrupt::default()));
+
 		Bus {
 			memory: [0; 64 * 1024],
 
-			wram: [0; (WRAM_END - WRAM_START) as usize],
-			hram: [0; (HRAM_END - HRAM_START) as usize],
+			intf: Rc::clone(&intf),
+			timer: Timer::new(Rc::clone(&intf)),
+
+			wram: [0; 0x8000],
+			hram: [0; 0x7F],
 		}
 
 	}
 
 	pub fn read_byte(&self, addr: u16) -> u8 {
 
-		//#[cfg(test)]
-		//return self.memory[addr as usize];
+		return match addr {
+			ROM_BANK1_START	..=	ROM_BANK1_END => self.memory[addr as usize],
+			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize],
 
-		// TODO replace with cart memory
-		if addr >= ROM_BANK1_START && addr <= ROM_BANK2_END {
-			return self.memory[addr as usize];
-		}
+			0xFF04			..= 0xFF07 => self.timer.read(addr),
+			0xFF0F			|	0xFFFF => self.intf.borrow_mut().read(addr),
 
-		if addr >= WRAM_START && addr <= WRAM_END {
-			return self.wram[(addr - WRAM_START) as usize];
-		}
-
-		if addr >= HRAM_START && addr <= HRAM_END {
-			return self.hram[(addr - HRAM_START) as usize];
-		}
-
-		// gameboy doctor
-		if addr == 0xFF44 {
-			return 0x90;
-		}
-
-		0
+			HRAM_START		..= HRAM_END => self.hram[(addr - HRAM_START) as usize],
+			0xFF44 => 0x90,
+			_ => self.memory[addr as usize]
+		};
 
 	}
 
@@ -157,16 +87,15 @@ impl Bus {
 		//self.memory[addr as usize] = write;
 		//return;
 
-		if addr >= ROM_BANK1_START && addr <= ROM_BANK2_END {
-			self.memory[addr as usize] = write;
-		}
+		match addr {
+			ROM_BANK1_START	..=	ROM_BANK2_END => self.memory[addr as usize] = write,
+			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize] = write,
 
-		if addr >= WRAM_START && addr <= WRAM_END {
-			self.wram[(addr - WRAM_START) as usize] = write;
-		}
+			0xFF04			..= 0xFF07 => self.timer.write(addr, write),
+			0xFF0F			|	0xFFFF => self.intf.borrow_mut().write(addr, write),
 
-		if addr >= HRAM_START && addr <= HRAM_END {
-			self.hram[(addr - HRAM_START - 1) as usize] = write;
+			HRAM_START		..=	HRAM_END => self.hram[(addr - HRAM_START) as usize] = write,
+			_ => self.memory[addr as usize] = write,
 		}
 
 	}

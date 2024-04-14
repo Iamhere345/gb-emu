@@ -15,7 +15,7 @@ impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
 
 		let mut emu = Gameboy::new();
-		emu.init(include_bytes!("../../tests/cpu_instrs/individual/06-ld r,r.gb"));
+		emu.init(include_bytes!("../../tests/instr_timing/instr_timing.gb"));
 
 		Self {
 			emu: emu,
