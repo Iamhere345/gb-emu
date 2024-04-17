@@ -36,7 +36,6 @@ pub struct Timer {
 	div_clock: Clock,
 
 	tima: u8,
-	tima_cycles: u64,
 	tima_clock: Clock,
 
 	tma: u8,
@@ -54,7 +53,6 @@ impl Timer {
 			div_clock: Clock::new(256),
 
 			tima: 0,
-			tima_cycles: 0,
 			tima_clock: Clock::new(1024),
 
 			tma: 0,

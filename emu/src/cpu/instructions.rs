@@ -44,7 +44,7 @@ pub fn get_imm16(cpu: &mut CPU) -> u16 {
 }
 
 fn set_debug_str(cpu: &mut CPU, from: &str, to: String) {
-	cpu.current_instruction = cpu.current_instruction.replace(from, to.as_str());
+	cpu.last_instruction = cpu.last_instruction.replace(from, to.as_str());
 }
 
 pub struct Instruction {

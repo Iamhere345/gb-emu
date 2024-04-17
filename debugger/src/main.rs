@@ -13,7 +13,7 @@ fn main() {
 
 	let mut emu = emu::Gameboy::new();
 
-	emu.init(include_bytes!("../../tests/cpu_instrs/individual/02-interrupts.gb"));
+	emu.init(include_bytes!("../../tests/instr_timing/instr_timing.gb"));
 
 	loop {
 		let clock_cycles_per_frame: usize = (4194304.0 / 60.0) as usize;
