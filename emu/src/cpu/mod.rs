@@ -16,8 +16,8 @@ pub struct CPU {
 	pub ime: bool,			// interrupt master enable
 	pub ei: u8,				// ei instruction executed; wait another cycle before enabling ime
 	pub halted: bool,		// used with the HALT instruction
-	pub wait_cycles: u16,	// used to count the number of cycles left until an instruction has finished
-	pub current_instruction: String,
+	pub instr_cycles: u64,	// the amount of cycles the last instruction took
+	pub last_instruction: String,
 }
 
 #[allow(dead_code)]
@@ -31,13 +31,34 @@ impl CPU {
 			ime: false,
 			ei: 0,
 			halted: false,
-			wait_cycles: 0,
-			current_instruction: String::new(),
+			instr_cycles: 0,
+			last_instruction: String::new(),
 		}
 	}
 
-	pub fn cycle(&mut self) -> bool {
+	pub fn cycle(&mut self) -> u64 {
 
+		self.ei = match self.ei {
+			1 => 2,
+			2 => {
+				self.ime = true;
+				0
+			},
+			_ => 0
+		};
+
+		let int_cycles = self.interrupt();
+
+		if int_cycles != 0 {
+			int_cycles
+		} else if self.halted {
+			4	// effectively a NOP
+		} else {
+			self.exec()
+		}
+	}
+
+	pub fn exec(&mut self) -> u64 {
 		let mut byte: u8 = self.bus.borrow().read_byte(self.pc);
 		let prefixed: bool;
 
@@ -56,47 +77,38 @@ impl CPU {
 		}
 
 		let mut executed: bool = false;
+		let mut instr_cycles: u64 = 4;
 
-		if !self.halted {
-			'instruction_execute:
-			for instruction in if prefixed { PREFIXED_INSTRUCTIONS.iter() } else { INSTRUCTIONS.iter() } {
-				for opcode in instruction.opcodes.iter() {
-					if byte == *opcode {
+		'instruction_execute:
+		for instruction in if prefixed { PREFIXED_INSTRUCTIONS.iter() } else { INSTRUCTIONS.iter() } {
+			for opcode in instruction.opcodes.iter() {
+				if byte == *opcode {
 
-						self.current_instruction = instruction.mnemonic.to_string();
+					self.last_instruction = instruction.mnemonic.to_string();
 
-						let mut cycles = instruction.cycles;
-						
-						(instruction.exec)(self, byte, &mut cycles);
-						
-						//println!("[0x{:x}][0x{:x}] {}", self.pc, byte, self.current_instruction);
+					let mut cycles = instruction.cycles;
+					
+					(instruction.exec)(self, byte, &mut cycles);
+					
+					//println!("[0x{:x}][0x{:x}] {}", self.pc, byte, self.current_instruction);
 
-						self.wait_cycles = cycles;
-						executed = true;
+					instr_cycles = cycles as u64;
+					executed = true;
 
-						break 'instruction_execute;
-					}
+					break 'instruction_execute;
 				}
 			}
-
-			if !executed {
-				panic!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
-			}
-
 		}
 
-		
+		if !executed {
+			println!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
+		}
 
-		// only set ime the after the instruction after ei has been executed
-		self.ei = match self.ei {
-			1 => 2,
-			2 => {
-				self.ime = true;
-				0
-			},
-			_ => 0
-		};
+		instr_cycles
 
+	}
+	
+	pub fn interrupt(&mut self) -> u64 {
 		// check for interrupts
 		if self.ime || self.halted {
 			let if_flags = self.bus.borrow().read_register(MemRegister::IF);
@@ -106,21 +118,36 @@ impl CPU {
 
 				if ((if_flags >> i) & 1) == 1 && ((ie_flags >> i) & 1) == 1 {
 					let flag: InterruptFlag = InterruptFlag::from_u8(((if_flags >> i) & 1) << i);
-					
-					self.interrupt(flag, InterruptSource::from_flag(flag));
+					let source = InterruptSource::from_flag(flag);
 
-					break;
+					// handle interrupt
+					if self.halted { 
+						self.halted = false;
+			
+						return 0;
+					}
+					
+					// clear the bit in IF
+					let new_if = self.bus.borrow().read_register(MemRegister::IF) & !(flag as u8);
+					self.bus.borrow_mut().write_register(MemRegister::IF, new_if);
+			
+			
+					self.ime = false;
+			
+					self.push16(self.pc);
+					self.pc = source as u16;
+
+					return 25; // 5 M-cycles
 				}
 
 			}
+
 		}
 
-		return executed;
-		
-
+		return 0;
 	}
-	
-	pub fn interrupt(&mut self, flag: InterruptFlag, source: InterruptSource) {
+
+	pub fn _interrupt(&mut self, flag: InterruptFlag, source: InterruptSource) {
 
 		// assumes the corresponding IE bit is true
 		// interrupts are checked before the next instruction is executed
@@ -143,7 +170,7 @@ impl CPU {
 		self.push16(self.pc);
 		self.pc = source as u16;
 
-		self.wait_cycles = 25;
+		self.instr_cycles = 25; // 5 M-cycles
 
 	}
 	

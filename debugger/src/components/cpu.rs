@@ -47,7 +47,7 @@ impl Cpu {
 
 		});
 
-		ui.label(format!("Executed Instruction Instruction: {}", emu.cpu.current_instruction));
+		ui.label(format!("Executed Instruction Instruction: {}", emu.cpu.last_instruction));
 
 	}
 
