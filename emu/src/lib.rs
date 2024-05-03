@@ -12,6 +12,7 @@ pub mod cpu;
 pub mod bus;
 pub mod interrupt;
 pub mod timer;
+pub mod ppu;
 
 pub struct Gameboy {
 	pub bus: Rc<RefCell<Bus>>,
