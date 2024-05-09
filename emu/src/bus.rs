@@ -99,6 +99,11 @@ impl Bus {
 			ROM_BANK1_START	..=	ROM_BANK2_END => self.memory[addr as usize] = write,
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize] = write,
 
+			/* PPU addresses */
+			0x8000			..= 0x9FFF => self.ppu.write(addr, write),
+			0xFE00			..=	0xFE9F => self.ppu.write(addr, write),
+			0xFF40 | 0xFF41 | 0xFF45 => self.ppu.write(addr, write),
+
 			0xFF04			..= 0xFF07 => self.timer.write(addr, write),
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().write(addr, write),
 
