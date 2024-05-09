@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use super::timer::Timer;
 use super::interrupt::Interrupt;
+use super::ppu::PPU;
 
 // possible off-by-one error
 const ROM_BANK1_START: 		u16	= 0x0;
@@ -29,6 +30,8 @@ pub struct Bus {
 
 	pub intf: Rc<RefCell<Interrupt>>,
 	pub timer: Timer,
+	pub ppu: PPU,
+	
 
 	wram: [u8; 0x8000],
 	hram: [u8; 0x7F],
@@ -59,6 +62,7 @@ impl Bus {
 
 			intf: Rc::clone(&intf),
 			timer: Timer::new(Rc::clone(&intf)),
+			ppu: PPU::new(),
 
 			wram: [0; 0x8000],
 			hram: [0; 0x7F],
@@ -72,11 +76,15 @@ impl Bus {
 			ROM_BANK1_START	..=	ROM_BANK1_END => self.memory[addr as usize],
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize],
 
+			/* PPU addresses */
+			0x8000			..= 0x9FFF => self.ppu.read(addr),
+			0xFE00			..=	0xFE9F => self.ppu.read(addr),
+			0xFF40 | 0xFF41 | 0xFF44 | 0xFF45 => self.ppu.read(addr),
+
 			0xFF04			..= 0xFF07 => self.timer.read(addr),
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().read(addr),
 
 			HRAM_START		..= HRAM_END => self.hram[(addr - HRAM_START) as usize],
-			0xFF44 => 0x90,
 			_ => self.memory[addr as usize]
 		};
 

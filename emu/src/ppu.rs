@@ -69,7 +69,7 @@ impl LCDC {
 
 }
 
-struct PPU {
+pub struct PPU {
 	rendering_mode: RenderingMode,
 
 	reg_ly: u8,         // 0xFF44: amount of lines drawn this frame, also the LY register
