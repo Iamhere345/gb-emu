@@ -103,6 +103,7 @@ impl Bus {
 			0x8000			..= 0x9FFF => self.ppu.write(addr, write),
 			0xFE00			..=	0xFE9F => self.ppu.write(addr, write),
 			0xFF40 | 0xFF41 | 0xFF45 => self.ppu.write(addr, write),
+			0xFF46 => self.dma_transfer(write),
 
 			0xFF04			..= 0xFF07 => self.timer.write(addr, write),
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().write(addr, write),
@@ -119,6 +120,16 @@ impl Bus {
 
 	pub fn write_register(&mut self, register: MemRegister, write: u8) {
 		self.write_byte(register as u16, write)
+	}
+
+	pub fn dma_transfer(&mut self, src: u8) {
+
+		let addr: u16 = (src as u16) << 8;	// addr is src * 100
+
+		for i in 0x0..0xA0 {
+			self.write_byte(0xFE00 + i, self.read_byte(addr + i))
+		}
+
 	}
 
 	pub fn clear_test_mem(&mut self) {
