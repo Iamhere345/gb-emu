@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use eframe::{run_native, App, NativeOptions};
+use eframe::{run_native, NativeOptions};
 use app::Debugger;
 
 mod app;

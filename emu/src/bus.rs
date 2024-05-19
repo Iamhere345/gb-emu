@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::timer::Timer;
@@ -62,7 +62,7 @@ impl Bus {
 
 			intf: Rc::clone(&intf),
 			timer: Timer::new(Rc::clone(&intf)),
-			ppu: PPU::new(),
+			ppu: PPU::new(Rc::clone(&intf)),
 
 			wram: [0; 0x8000],
 			hram: [0; 0x7F],

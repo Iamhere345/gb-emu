@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use eframe::egui::*;
 
 use emu::Gameboy;
