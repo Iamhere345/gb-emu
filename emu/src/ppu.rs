@@ -1,5 +1,10 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 
-enum RenderingMode {
+use super::interrupt::*;
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum RenderingMode {
 	HBlank 	= 0,    // Mode 0
 	VBlank 	= 1,    // Mode 1
 	OAMscan = 2,    // Mode 2
@@ -70,14 +75,16 @@ impl LCDC {
 }
 
 pub struct PPU {
-	rendering_mode: RenderingMode,
+	pub rendering_mode: RenderingMode,
+
+	intf: Rc<RefCell<Interrupt>>,
 
 	reg_ly: u8,         // 0xFF44: amount of lines drawn this frame, also the LY register
 	reg_lyc: u8,        // 0xFF45: if lyc == ly and LYC=LY in STAT register set, raise interrupt
 	reg_stat: u8,		// 0xFF41: LCD status register. Can be used to raise interrupts at various stages of rendering
 	reg_lcdc: LCDC,		// 0xFF40: LCD control register. Can be used to alter the behaviour of the LCD and PPU
 
-	line_dots: u8,      // amount of dots that has passed; reset each line
+	pub line_dots: i32, // amount of dots that has passed; reset each line.
 
 	vram: [u8; 0x2000], // 8k
 	oam: [u8; 160]
@@ -85,9 +92,11 @@ pub struct PPU {
 
 impl PPU {
 
-	pub fn new() -> Self {
+	pub fn new(intf: Rc<RefCell<Interrupt>>) -> Self {
 		Self {
 			rendering_mode: RenderingMode::VBlank,
+
+			intf: intf,
 
 			reg_ly: 0,
 			reg_lyc: 0,
@@ -103,6 +112,78 @@ impl PPU {
 
 	// called directly after the cpu has been ticked, and updates accordingly
 	pub fn tick(&mut self, cycles: u64) {
+
+		if !self.reg_lcdc.lcd_enable {
+			self.rendering_mode = RenderingMode::VBlank;
+			self.reg_ly = 0;
+			self.line_dots = 0;
+
+			return;
+		}
+
+		self.line_dots += cycles as i32; // 1 T-state == 1 dot
+
+		/* Rendering mode logic */
+
+		// OAM scan (mode 2)
+		if self.line_dots <= 80 {
+			if self.reg_stat & StatFlag::Mode2Int as u8 != 0 && self.rendering_mode != RenderingMode::OAMscan {
+				self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+			}
+			
+			self.rendering_mode = RenderingMode::OAMscan;
+
+		// Draw (mode 3)
+		} else if self.line_dots <= 80 + 172 {
+			self.rendering_mode = RenderingMode::Draw;
+		
+		// HBlank (Mode 0)
+		} else if self.line_dots > 80 + 172 {
+			self.rendering_mode = RenderingMode::HBlank;
+
+			if self.reg_stat & StatFlag::Mode0Int as u8 != 0 && self.rendering_mode != RenderingMode::HBlank {
+				self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+			}
+		}
+
+		// new line
+		if self.line_dots >= 456 {
+
+			let dots_carry = if self.line_dots > 0 { self.line_dots - 456 } else { 0 };
+
+			// go to the next line and reset the line counter
+			self.reg_ly += 1;
+			self.line_dots = dots_carry;
+
+			// LYC
+			if self.reg_ly == self.reg_lyc {
+				self.reg_stat |= StatFlag::LYCcmp as u8;
+
+				if self.reg_stat & StatFlag::LYCInt as u8 != 0 {
+					self.intf.borrow_mut().raise(InterruptFlag::LCDC);
+				}
+			}
+
+			// VBlank
+			if self.reg_ly == 144 {
+
+				self.rendering_mode = RenderingMode::VBlank;
+				self.intf.borrow_mut().raise(InterruptFlag::VBlank);
+
+				if self.reg_stat & StatFlag::Mode1Int as u8 != 0 {
+					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+				}
+			}
+
+			// end of VBlank
+			if self.reg_ly == 154 {
+				self.reg_ly = 0;
+			}
+
+		}
+
+		// update stat register for potentially new rendering mode
+		self.reg_stat = self.reg_stat & self.rendering_mode as u8;
 
 	}
 

@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use eframe::egui::*;
 
 use emu::{cpu, Gameboy};
@@ -32,7 +30,7 @@ impl Cpu {
 
 			ui.label(format!("[HL]: 0x{:X}", emu.cpu.get_8bit_reg(emu::cpu::registers::Register8Bit::HL)));
 
-			ui.label(format!("Cycles: {}", emu.cycles));0
+			ui.label(format!("Cycles: {}", emu.cycles));
 
 		});
 
@@ -47,7 +45,7 @@ impl Cpu {
 
 		});
 
-		ui.label(format!("Executed Instruction Instruction: {}", emu.cpu.last_instruction));
+		ui.label(format!("Executed Instruction: {}", emu.cpu.last_instruction));
 
 	}
 

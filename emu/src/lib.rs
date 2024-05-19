@@ -1,12 +1,8 @@
 use cpu::*;
-use cpu::registers::*;
 use bus::Bus;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-
-use std::io::{prelude::*, BufWriter};
-use std::fs::File;
 
 pub mod cpu;
 pub mod bus;
@@ -78,6 +74,7 @@ impl Gameboy {
 		let instr_cycles = self.cpu.cycle();
 
 		self.bus.borrow_mut().timer.tick(instr_cycles);
+		self.bus.borrow_mut().ppu.tick(instr_cycles);
 
 		if self.bus.borrow().read_byte(0xFF02) == 0x81 {
 

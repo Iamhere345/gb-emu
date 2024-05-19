@@ -1,8 +1,7 @@
-use std::{default, fs};
+use std::fs;
 
-use emu::{bus::*, cpu::{self, registers::*, *}, Gameboy};
+use emu::{ cpu::{registers::*, *}, Gameboy};
 use serde::{Deserialize, Serialize};
-use serde_json::Result;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitialState {
