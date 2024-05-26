@@ -28,7 +28,7 @@ struct LCDC {
 	bg_tilemap_area: bool,		// 0: 0x9800-0x9BFF 1: 0x9C00-0x9FFF
 	obj_size: bool,				// 0: 8x8 1: 8x16
 	obj_enable: bool,			// 0: objects disabled 1: objects enabled
-	bg_window_enable: bool		// 0: bg and window are disabled (even if window_enable is 1)
+	bg_enable: bool				// 0: bg and window are disabled (even if window_enable is 1)
 }
 
 impl LCDC {
@@ -42,7 +42,7 @@ impl LCDC {
 			bg_tilemap_area: false,
 			obj_size: false,
 			obj_enable: false,
-			bg_window_enable: false
+			bg_enable: false
 		};
 
 		lcdc.write(initial_write);
@@ -51,7 +51,7 @@ impl LCDC {
 	}
 
 	pub fn read(&self) -> u8 {
-		(if self.bg_window_enable 			{ 0x01 } else { 0 })
+		(if self.bg_enable		 			{ 0x01 } else { 0 })
             | (if self.obj_enable 			{ 0x02 } else { 0 })
             | (if self.obj_size 			{ 0x04 } else { 0 })
             | (if self.bg_tilemap_area 		{ 0x08 } else { 0 })
@@ -62,7 +62,7 @@ impl LCDC {
 	}
 
 	pub fn write(&mut self, write: u8) {
-		self.bg_window_enable 		= write & 0x01 != 0;
+		self.bg_enable		 		= write & 0x01 != 0;
 		self.obj_enable 			= write & 0x02 != 0;
 		self.obj_size 				= write & 0x04 != 0;
 		self.bg_tilemap_area 		= write & 0x08 != 0;
@@ -78,6 +78,11 @@ pub struct PPU {
 	pub rendering_mode: RenderingMode,
 
 	intf: Rc<RefCell<Interrupt>>,
+
+	reg_scy: u8,		// 0xFF42: Y scroll register
+	reg_scx: u8,		// 0xFF43: X scroll register
+	reg_wy: u8,			// 0xFF4A: window Y position
+	reg_wx: u8,			// 0xFF4B: window X position - 7
 
 	reg_ly: u8,         // 0xFF44: amount of lines drawn this frame, also the LY register
 	reg_lyc: u8,        // 0xFF45: if lyc == ly and LYC=LY in STAT register set, raise interrupt
@@ -97,6 +102,11 @@ impl PPU {
 			rendering_mode: RenderingMode::VBlank,
 
 			intf: intf,
+
+			reg_scy: 0,
+			reg_scx: 0,
+			reg_wy: 0,
+			reg_wx: 0,
 
 			reg_ly: 0,
 			reg_lyc: 0,
@@ -187,6 +197,56 @@ impl PPU {
 
 	}
 
+	fn draw_scanline(&mut self) {
+
+		if self.reg_lcdc.bg_enable {
+			self.draw_tiles()
+		}
+
+		if self.reg_lcdc.obj_enable {
+			// todo
+		}
+
+	}
+
+	fn draw_tiles(&mut self) {
+
+		let draw_window = if self.reg_lcdc.window_enable && self.reg_wy <= self.reg_ly { true } else { false };
+		let mut index_signed = false;
+
+		let tile_data: u16 = match self.reg_lcdc.tile_data_area {
+			true => 0x8000,
+			false => {
+				// indexes into the 0x8800-0x0x97FF are signed
+				index_signed = true;
+
+				0x8800
+			}
+		};
+		let tilemap_area: u16 = if draw_window {
+			match self.reg_lcdc.window_tilemap_area {
+				true => 0x9C00,
+				false => 0x9800,
+			}
+		} else {
+			match self.reg_lcdc.bg_tilemap_area {
+				true => 0x9C00,
+				false => 0x9800,
+			}
+		};
+
+		let pos_y: u8 = match draw_window {
+			true => self.reg_ly - self.reg_wy,
+			false => self.reg_scy + self.reg_ly,
+		};
+
+		
+		let tile_row: u16 = ((pos_y / 8) * 32) as u16;
+
+
+
+	}
+
 	pub fn read(&self, addr: u16) -> u8 {
 		match addr {
 			0x8000..=0x9FFF => self.vram[(addr - 0x8000) as usize],
@@ -194,8 +254,12 @@ impl PPU {
 
 			0xFF40 => self.reg_lcdc.read(),
 			0xFF41 => self.reg_stat,
+			0xFF42 => self.reg_scy,
+			0xFF43 => self.reg_scx,
 			0xFF44 => self.reg_ly,
 			0xFF45 => self.reg_lyc,
+			0xFF4A => self.reg_wy,
+			0xFF4B => self.reg_wx,
 			_ => panic!("invalid ppu read address")
 		}
 	}
@@ -207,7 +271,11 @@ impl PPU {
 
 			0xFF40 => self.reg_lcdc.write(write),
 			0xFF41 => self.reg_stat = write & (self.reg_stat & 0b111),
+			0xFF42 => self.reg_scy = write,
+			0xFF43 => self.reg_scx = write,
 			0xFF45 => self.reg_lyc = write,
+			0xFF4A => self.reg_wy = write,
+			0xFF4B => self.reg_wx = write,
 			_ => panic!("invalid ppu write address")
 		}
 	}
