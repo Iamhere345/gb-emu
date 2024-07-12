@@ -4,13 +4,15 @@ use eframe::{egui, App};
 
 use emu::Gameboy;
 
-use crate::components::{control::Control, cpu::Cpu, ppu::Ppu};
+use crate::components::{control::Control, cpu::Cpu, ppu::Ppu, display::Display};
 
 const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
 
 pub struct Debugger {
 	emu: Gameboy,
 	last_update: Instant,
+
+	display: Display,
 
 	control: Control,
 	cpu: Cpu,
@@ -21,11 +23,13 @@ impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
 
 		let mut emu = Gameboy::new();
-		emu.init(include_bytes!("../../tests/cpu_instrs/cpu_instrs.gb"));
+		emu.init(include_bytes!("../../dmg_bootrom.gb"));
 
 		Self {
 			emu: emu,
 			last_update: Instant::now(),
+
+			display: Display::new(),
 
 			control: Control::new(),
 			cpu: Cpu::new(),
@@ -73,7 +77,7 @@ impl App for Debugger {
 
 		
 		egui::CentralPanel::default().show(ctx, |ui| {
-			ui.label("Hello, World!");
+			self.display.show(ctx, ui, &mut self.emu)
 		});
 		
 		ctx.request_repaint();

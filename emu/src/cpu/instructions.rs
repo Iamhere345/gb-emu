@@ -535,11 +535,11 @@ fn CALL_COND_A16(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	}
 
 	let new_addr = get_imm16(cpu);
-
-	set_debug_str(cpu, "a16", format!("0x{:X}", new_addr));
-
+	
 	cpu.pc = cpu.pc.wrapping_add(1);
 
+	set_debug_str(cpu, "a16", format!("0x{:X} (push 0x{:X})", new_addr, cpu.pc));
+	
 	// push current address onto the stack
 	cpu.push16(cpu.pc);
 	
@@ -632,7 +632,7 @@ fn LD_R8_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let src = Register8Bit::from_r8(opcode & 7);
 	let dst = Register8Bit::from_r8((opcode >> 3) & 7);
 
-	set_debug_str(cpu, "r8,", format!("{:?},", src));
+	set_debug_str(cpu, "r8,", format!("{:?},", dst));
 	set_debug_str(cpu, ", r8", format!(", {:?}", src));
 
 	let value = cpu.get_8bit_reg(src);
@@ -700,12 +700,18 @@ fn LD_R16MEM_A(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let dest_info = Register16Bit::from_r16mem(opcode >> 4);
 	let dest = cpu.registers.get_16bit_reg(dest_info.0);
 
-	set_debug_str(cpu, "r16mem", format!("{:?}", dest_info.0));
+	if dest_info.1 == 0 {
+		set_debug_str(cpu, "r16mem", format!("{:?}", dest_info.0));
+	} else if dest_info.1 > 0 {
+		set_debug_str(cpu, "r16mem", format!("{:?}+", dest_info.0));
+	} else if dest_info.1 < 0 {
+		set_debug_str(cpu, "r16mem", format!("{:?}-", dest_info.0));
+	}
 
 	cpu.bus.borrow_mut().write_byte(dest, cpu.registers.get_8bit_reg(Register8Bit::A));
 
 	// postinc or postdec
-	cpu.registers.set_16bit_reg(dest_info.0, (dest as i16 + dest_info.1 as i16) as u16);
+	cpu.registers.set_16bit_reg(dest_info.0, ((dest as i16).wrapping_add(dest_info.1 as i16)) as u16);
 
 	cpu.pc = cpu.pc.wrapping_add(1);
 
@@ -725,7 +731,13 @@ fn LD_A_R16MEM(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 	let src_info = Register16Bit::from_r16mem(opcode >> 4);
 	let src = cpu.registers.get_16bit_reg(src_info.0);
 
-	set_debug_str(cpu, "r16mem", format!("{:?}", src_info.0));
+	if src_info.1 == 0 {
+		set_debug_str(cpu, "r16mem", format!("{:?}", src_info.0));
+	} else if src_info.1 > 0 {
+		set_debug_str(cpu, "r16mem", format!("{:?}+", src_info.0));
+	} else if src_info.1 < 0 {
+		set_debug_str(cpu, "r16mem", format!("{:?}-", src_info.0));
+	}
 
 	let new_a = cpu.bus.borrow().read_byte(src);
 
@@ -1197,9 +1209,9 @@ fn OR(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 /*
 
-MNEMONIC: CP A, r8
+MNEMONIC: CP A, r8 / n8
 OPCODES: 0x8(0-F)
-DESC: Subtracts r8 from A, doesn't set A
+DESC: Subtracts r8 / n8 from A, doesn't set A
 FLAGS: Z 1 H C
 
 */
@@ -1211,7 +1223,7 @@ fn CP(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 			*cycles = 8;
 
 			let rhs = get_imm8(cpu);
-			set_debug_str(cpu, "imm8", format!("0x{:X}", rhs));
+			set_debug_str(cpu, "n8", format!("0x{:X}", rhs));
 			
 			rhs
 		},

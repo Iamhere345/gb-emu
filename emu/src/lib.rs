@@ -37,7 +37,7 @@ impl Gameboy {
 			self.bus.borrow_mut().write_byte(i.try_into().unwrap(), *byte)
 		}
 
-		self.cpu.pc = 0xFF;
+		self.cpu.pc = 0x0;
 
 		// temp
 		/*
@@ -84,6 +84,18 @@ impl Gameboy {
 
 			self.bus.borrow_mut().write_byte(0xFF02, 0);
 		}
+
+	}
+
+	pub fn run_frame(&mut self) {
+
+		while !self.bus.borrow().intf.borrow().is_raised(interrupt::InterruptFlag::VBlank) {
+
+			self.tick();
+
+		}
+
+		self.bus.borrow_mut().intf.borrow_mut().clear(interrupt::InterruptFlag::VBlank);
 
 	}
 
