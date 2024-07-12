@@ -65,7 +65,7 @@ impl LCDC {
 
 	pub fn write(&mut self, write: u8) {
 
-		println!("write lcdc {:b}", write);
+		//println!("write lcdc {:b}", write);
 
 		self.bg_enable		 		= write & 0x01 != 0;
 		self.obj_enable				= write & 0x02 != 0;
@@ -112,14 +112,16 @@ impl Palette {
 
 	pub fn new() -> Self {
 		Self {
-			id_0: GBColour::Black,
-			id_1: GBColour::DarkGrey,
-			id_2: GBColour::LightGrey,
-			id_3: GBColour::White,
+			id_0: GBColour::White,
+			id_1: GBColour::LightGrey,
+			id_2: GBColour::DarkGrey,
+			id_3: GBColour::Black,
 		}
 	}
 
 	pub fn get_pal_value(&self, id: u8) -> GBColour {
+
+
 
 		match id {
 			0 => self.id_0,
@@ -261,7 +263,7 @@ impl PPU {
 				self.rendering_mode = RenderingMode::VBlank;
 				self.intf.borrow_mut().raise(InterruptFlag::VBlank);
 
-				println!("vblank");
+				//println!("vblank");
 
 				if self.reg_stat & StatFlag::Mode1Int as u8 != 0 {
 					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
@@ -297,87 +299,42 @@ impl PPU {
 
 	}
 
-	/*
-		The gameboy has 32x32 tiles, on a 256x256 pixel grid, however only 160x144 pixels are displayed on the screen.
-	*/
 	fn draw_tiles(&mut self) {
 
-		let draw_window = if self.reg_lcdc.window_enable && self.reg_wy <= self.reg_ly { true } else { false };
-		let mut index_signed = false;
-
-		// the base address of the tile data to be drawn (either 0x8000 or 0x8800)
-		let tile_data: u16 = match self.reg_lcdc.tile_data_area {
-			true => 0x8000,
-			false => {
-				// indexes into the 0x8800-0x0x97FF are signed
-				index_signed = true;
-
-				0x8800
-			}
+		// get tile data area base address (from lcdc tile_data_area)
+		let (tile_data_area, sign): (u16, bool) = match self.reg_lcdc.tile_data_area {
+			false => (0x8800, true),
+			true => (0x8000, false),
 		};
 
-		// base address of the tilemap we're using
-		let tilemap_area: u16 = if draw_window {
-			match self.reg_lcdc.window_tilemap_area {
-				true => 0x9C00,
-				false => 0x9800,
-			}
-		} else {
-			match self.reg_lcdc.bg_tilemap_area {
-				true => 0x9C00,
-				false => 0x9800,
-			}
+		// get tilemap area (from lcdc bg_tilemap_area)
+		let tilemap_area: u16 = match self.reg_lcdc.bg_tilemap_area {
+			false => 0x9800,
+			true => 0x9C00,
 		};
 
-		// used to calculate which of the 32 vertical tiles the scanline is on
-		let pos_y: u8 = match draw_window {
-			true => self.reg_ly - self.reg_wy,
-			false => self.reg_scy + self.reg_ly,
-		};
+		for x in 0..160 {
 
-		// which of the 8 vertical pixels is the scanline on
-		let tile_row: u16 = (pos_y / 8) as u16 * 32;
+			// get tile id
+			let tile_id = self.read(tilemap_area + ((self.reg_ly as u16 / 8) * 32) + (x / 8));		
 
-		for pixel in 0..160 {
-
-			// current x position with scroll / window space conversion
-			let pos_x: u8 = match self.reg_lcdc.window_enable && pixel >= self.reg_wx {
-				false => pixel + self.reg_scx,
-				true => pixel - self.reg_wx
+			// get tile data base address
+			let tile_base_addr = match sign {
+				false => tile_data_area + tile_id as u16 * 16,
+				true => tile_data_area.wrapping_add(((tile_id as i8) as u16).wrapping_mul(16)),
 			};
 
-			// which of the 32 horizontal tiles is pos_x in?
-			let tile_col: u16 = (pos_x / 8) as u16;
+			let tile_addr_offset = (self.reg_ly % 8) as u16 * 2;
 
-			// get the tile id
-			let tile_id = self.read(tilemap_area + tile_row + tile_col);
+			let data_1 = self.read(tile_base_addr + tile_addr_offset);
+			let data_2 = self.read(tile_base_addr + tile_addr_offset + 1);
 
-			let tile_addr = match index_signed {
-				true => tile_data + ((tile_id.wrapping_add(128) as i8) * 16) as u16,
-				false => tile_data + (tile_id as u16 * 16),
-			};
-
-			// the offset from the tile data base for the line of the tile we are on
-			let tile_line = (pos_y % 8) * 2;	// every line is 2 bytes
-
-			let data_1 = self.read(tile_addr + tile_line as u16);
-			let data_2 = self.read(tile_addr + tile_line as u16 + 1);
-
-			// the bit in data 1/2 we are using to get the palette index
-			//let colour_bit: i32 = ((pos_x % 8) as i32 - 7) * -1; // idk what this other stuff is doing; TODO test with and without -7*-1
+			// the index of the tiles used to form the palette id for this pixel
+			let pixel_index = 7 - (x % 8);		// the 7 is there to swap which bit is selected
 			
-			let colour_bit: i32 = (pos_x % 8) as i32;
+			let pal_id = (data_1 & (1 << pixel_index) >> pixel_index) | (data_2 & (1 << pixel_index) >> pixel_index) << 1;
 
-			// combine corresponding bits in data 2/1 to get the bgp index
-			let pal_index = ((data_2 & (1 >> colour_bit)) << 1) | data_1 & (1 >> colour_bit);
-
-			if tile_id != 0 {
-				println!("d1: 0b{:b} d2: 0b{:b}, cbit: {}, px: {}, tile_addr: 0x{:X}, tile_line: 0x{:X}, tile_id: {}", data_1, data_2, colour_bit, pos_x, tile_addr, tile_line, tile_id);
-				println!("d1: 0x{:X} d2: 0x{:X} sign: {}", tile_addr + tile_line as u16, tile_addr + tile_line as u16 + 1, index_signed);
-				println!("set pixel ({}, {}) to {:?} ({})", pixel, self.reg_ly, self.reg_bgp.get_pal_value(pal_index), pal_index);
-			}
-
-			self.pixel_buf[pixel as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_index)
+			self.pixel_buf[x as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
 
 		}
 

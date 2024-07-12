@@ -33,7 +33,8 @@ fn main() {
     let mut event_pump = sdl_ctx.event_pump().unwrap();
 
     let mut emu = Gameboy::new();
-    emu.init(include_bytes!("../../dmg_bootrom.gb"));
+    emu.init(include_bytes!("../../dmg-acid2.gb"));
+    //emu.init(include_bytes!("../../tests/cpu_instrs/individual/09-op r,r.gb"));
 
     let mut last_update = Instant::now();
 
@@ -76,7 +77,7 @@ fn main() {
                 GBColour::White => canvas.set_draw_color(Color::RGB(255, 255, 255)),
             }
 
-            canvas.draw_rect(Rect::new((x as u32 * UPSCALE_FACTOR) as i32, (y as u32 * UPSCALE_FACTOR) as i32, UPSCALE_FACTOR, UPSCALE_FACTOR)).expect("Unable to draw pixel");
+            canvas.fill_rect(Rect::new((x as u32 * UPSCALE_FACTOR) as i32, (y as u32 * UPSCALE_FACTOR) as i32, UPSCALE_FACTOR, UPSCALE_FACTOR)).expect("Unable to draw pixel");
 
         }
 
