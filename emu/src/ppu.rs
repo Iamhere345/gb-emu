@@ -64,8 +64,11 @@ impl LCDC {
 	}
 
 	pub fn write(&mut self, write: u8) {
+
+		println!("write lcdc {:b}", write);
+
 		self.bg_enable		 		= write & 0x01 != 0;
-		self.obj_enable 			= write & 0x02 != 0;
+		self.obj_enable				= write & 0x02 != 0;
 		self.obj_size 				= write & 0x04 != 0;
 		self.bg_tilemap_area 		= write & 0x08 != 0;
 		self.tile_data_area 		= write & 0x010 != 0;
@@ -76,47 +79,47 @@ impl LCDC {
 
 }
 
-#[derive(Clone, Copy)]
-enum GbColour {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum GBColour {
 	White = 0,
 	LightGrey = 1,
 	DarkGrey = 2,
 	Black = 3
 }
 
-impl From<u8> for GbColour {
+impl From<u8> for GBColour {
 	
-	fn from(from: u8) -> GbColour {
+	fn from(from: u8) -> GBColour {
 		match from {
-			0 => GbColour::White,
-			1 => GbColour::LightGrey,
-			2 => GbColour::DarkGrey,
-			3 => GbColour::Black,
-			_ => panic!("invalid EmuColour")
+			0 => GBColour::White,
+			1 => GBColour::LightGrey,
+			2 => GBColour::DarkGrey,
+			3 => GBColour::Black,
+			_ => panic!("invalid GBColour")
 		}
 	}
 
 }
 
 struct Palette {
-	id_0: GbColour,
-	id_1: GbColour,
-	id_2: GbColour,
-	id_3: GbColour,
+	id_0: GBColour,
+	id_1: GBColour,
+	id_2: GBColour,
+	id_3: GBColour,
 }
 
 impl Palette {
 
 	pub fn new() -> Self {
 		Self {
-			id_0: GbColour::Black,
-			id_1: GbColour::DarkGrey,
-			id_2: GbColour::LightGrey,
-			id_3: GbColour::White,
+			id_0: GBColour::Black,
+			id_1: GBColour::DarkGrey,
+			id_2: GBColour::LightGrey,
+			id_3: GBColour::White,
 		}
 	}
 
-	pub fn get_pal_value(&self, id: u8) -> GbColour {
+	pub fn get_pal_value(&self, id: u8) -> GBColour {
 
 		match id {
 			0 => self.id_0,
@@ -136,10 +139,12 @@ impl Palette {
 	}
 
 	pub fn write(&mut self, write: u8) {
-		self.id_0 = GbColour::from(write & 0b11);
-		self.id_1 = GbColour::from((write >> 2) & 0b11);
-		self.id_2 = GbColour::from((write >> 4) & 0b11);
-		self.id_3 = GbColour::from((write >> 6) & 0b11);
+		self.id_0 = GBColour::from(write & 0b11);
+		self.id_1 = GBColour::from((write >> 2) & 0b11);
+		self.id_2 = GBColour::from((write >> 4) & 0b11);
+		self.id_3 = GBColour::from((write >> 6) & 0b11);
+
+		println!("write pal");
 	}
 
 }
@@ -165,7 +170,7 @@ pub struct PPU {
 	vram: [u8; 0x2000], // 8k
 	oam: [u8; 160],
 
-	pixel_buf: [GbColour; 144 * 160]
+	pub pixel_buf: [GBColour; 144 * 160]
 }
 
 impl PPU {
@@ -192,7 +197,7 @@ impl PPU {
 			vram: [0; 0x2000],
 			oam: [0; 160],
 
-			pixel_buf: [GbColour::Black; 144 * 160]
+			pixel_buf: [GBColour::LightGrey; 144 * 160]
 		}
 	}
 
@@ -256,6 +261,8 @@ impl PPU {
 				self.rendering_mode = RenderingMode::VBlank;
 				self.intf.borrow_mut().raise(InterruptFlag::VBlank);
 
+				println!("vblank");
+
 				if self.reg_stat & StatFlag::Mode1Int as u8 != 0 {
 					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
 				}
@@ -264,6 +271,11 @@ impl PPU {
 			// end of VBlank
 			if self.reg_ly == 154 {
 				self.reg_ly = 0;
+			}
+
+			// draw scanline
+			if self.reg_ly < 144 {
+				self.draw_scanline();
 			}
 
 		}
@@ -338,11 +350,11 @@ impl PPU {
 			let tile_col: u16 = (pos_x / 8) as u16;
 
 			// get the tile id
-			let tile_id = self.read(tilemap_area +tile_row +tile_col);
+			let tile_id = self.read(tilemap_area + tile_row + tile_col);
 
 			let tile_addr = match index_signed {
 				true => tile_data + ((tile_id.wrapping_add(128) as i8) * 16) as u16,
-				false => tile_data + (tile_id * 16) as u16,
+				false => tile_data + (tile_id as u16 * 16),
 			};
 
 			// the offset from the tile data base for the line of the tile we are on
@@ -352,12 +364,20 @@ impl PPU {
 			let data_2 = self.read(tile_addr + tile_line as u16 + 1);
 
 			// the bit in data 1/2 we are using to get the palette index
-			let colour_bit: i32 = ((pos_x % 8) as i32 - 7) * -1; // idk what this other stuff is doing; TODO test with and without -7*-1
+			//let colour_bit: i32 = ((pos_x % 8) as i32 - 7) * -1; // idk what this other stuff is doing; TODO test with and without -7*-1
+			
+			let colour_bit: i32 = (pos_x % 8) as i32;
 
 			// combine corresponding bits in data 2/1 to get the bgp index
 			let pal_index = ((data_2 & (1 >> colour_bit)) << 1) | data_1 & (1 >> colour_bit);
 
-			self.pixel_buf[(pixel + 160 * self.reg_ly) as usize] = self.reg_bgp.get_pal_value(pal_index)
+			if tile_id != 0 {
+				println!("d1: 0b{:b} d2: 0b{:b}, cbit: {}, px: {}, tile_addr: 0x{:X}, tile_line: 0x{:X}, tile_id: {}", data_1, data_2, colour_bit, pos_x, tile_addr, tile_line, tile_id);
+				println!("d1: 0x{:X} d2: 0x{:X} sign: {}", tile_addr + tile_line as u16, tile_addr + tile_line as u16 + 1, index_signed);
+				println!("set pixel ({}, {}) to {:?} ({})", pixel, self.reg_ly, self.reg_bgp.get_pal_value(pal_index), pal_index);
+			}
+
+			self.pixel_buf[pixel as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_index)
 
 		}
 
@@ -374,6 +394,7 @@ impl PPU {
 			0xFF43 => self.reg_scx,
 			0xFF44 => self.reg_ly,
 			0xFF45 => self.reg_lyc,
+			0xFF47 => self.reg_bgp.read(),
 			0xFF4A => self.reg_wy,
 			0xFF4B => self.reg_wx,
 			_ => panic!("invalid ppu read address")
@@ -390,6 +411,7 @@ impl PPU {
 			0xFF42 => self.reg_scy = write,
 			0xFF43 => self.reg_scx = write,
 			0xFF45 => self.reg_lyc = write,
+			0xFF47 => self.reg_bgp.write(write),
 			0xFF4A => self.reg_wy = write,
 			0xFF4B => self.reg_wx = write,
 			_ => panic!("invalid ppu write address")

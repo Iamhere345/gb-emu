@@ -3,5 +3,6 @@ resolver = "2"
 
 members = [
 	"emu",
-	"debugger"
+	"debugger", 
+	"frontend-sdl"
 ]

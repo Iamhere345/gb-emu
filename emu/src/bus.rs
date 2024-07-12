@@ -79,8 +79,8 @@ impl Bus {
 			/* PPU addresses */
 			0x8000			..= 0x9FFF => self.ppu.read(addr),
 			0xFE00			..=	0xFE9F => self.ppu.read(addr),
-			0xFF40 | 0xFF41 | 0xFF44 | 0xFF45 => self.ppu.read(addr),
-
+			0xFF40 | 0xFF41 | 0xFF44 | 0xFF45 | 0xFF47 => self.ppu.read(addr),
+			
 			0xFF04			..= 0xFF07 => self.timer.read(addr),
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().read(addr),
 

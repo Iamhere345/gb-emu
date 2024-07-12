@@ -73,4 +73,15 @@ impl Interrupt {
 		self.flags |= flag as u8;
 	}
 
+	pub fn clear(&mut self, flag: InterruptFlag) {
+		self.flags &= !(flag as u8);
+	}
+
+	pub fn is_raised(&self, flag: InterruptFlag) -> bool {
+		if self.flags & flag as u8 != 0 {
+			return true;
+		}
+		false
+	}
+
 }
