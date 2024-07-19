@@ -33,8 +33,8 @@ fn main() {
     let mut event_pump = sdl_ctx.event_pump().unwrap();
 
     let mut emu = Gameboy::new();
-    emu.init(include_bytes!("../../dmg-acid2.gb"));
-    //emu.init(include_bytes!("../../tests/cpu_instrs/individual/09-op r,r.gb"));
+    //emu.init(include_bytes!("../../dmg-acid2.gb"));
+    emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
 
     let mut last_update = Instant::now();
 
@@ -55,9 +55,11 @@ fn main() {
         if last_update.elapsed() >= Duration::from_secs_f64(1.0 / 60.0) {
 
 			let mut frames = last_update.elapsed().as_secs_f64();
-
-			while frames >= 1.0 / 60.0 {
-				emu.run_frame();
+           
+            while frames >= 1.0 / 60.0 {
+				for _ in 0..CYCLES_PER_FRAME {
+					emu.tick();
+				}
 
 				frames -= CYCLES_PER_FRAME as f64;
 			}

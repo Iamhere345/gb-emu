@@ -60,9 +60,9 @@ fn sm83_test_data() {
 
 		let entry = entry_res.unwrap();
 
-		//if i < 497 {
-			//continue;
-		//}
+		/* if i < 21 {
+			continue;
+		} */
 
 		let test_str: String = fs::read_to_string(entry.path()).unwrap();
 
@@ -98,6 +98,7 @@ fn sm83_test_data() {
 				gb.tick();
 			}
 			*/
+			
 
 			gb.cpu.cycle();
 
@@ -106,19 +107,23 @@ fn sm83_test_data() {
 				test.final_state.a,
 				gb.cpu.registers.get_8bit_reg(Register8Bit::A)	
 			);
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::B), test.final_state.b, "B comparison failed (final: 0x{:x} actual: 0x{:x})",
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::B), test.final_state.b, "B comparison failed (initial: 0x{:x} final: 0x{:x} actual: 0x{:x})",
+				test.initial_state.b,
 				test.final_state.b,
 				gb.cpu.registers.get_8bit_reg(Register8Bit::B)	
 			);
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::C), test.final_state.c, "C comparison failed (final: 0x{:x} actual: 0x{:x})",
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::C), test.final_state.c, "C comparison failed (initial: 0x{:x} final: 0x{:x} actual: 0x{:x})",
+				test.initial_state.c,
 				test.final_state.c,
 				gb.cpu.registers.get_8bit_reg(Register8Bit::C)	
 			);
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::D), test.final_state.d, "D comparison failed (final: 0x{:x} actual: 0x{:x})",
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::D), test.final_state.d, "D comparison failed (initial: 0x{:x} final: 0x{:x} actual: 0x{:x})",
+				test.initial_state.d,
 				test.final_state.d,
 				gb.cpu.registers.get_8bit_reg(Register8Bit::D)	
 			);
-			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::E), test.final_state.e, "E comparison failed (final: 0x{:x} actual: 0x{:x})",
+			assert_eq!(gb.cpu.registers.get_8bit_reg(Register8Bit::E), test.final_state.e, "E comparison failed (initial: 0x{:x} final: 0x{:x} actual: 0x{:x})",
+				test.initial_state.e,
 				test.final_state.e,
 				gb.cpu.registers.get_8bit_reg(Register8Bit::E)	
 			);

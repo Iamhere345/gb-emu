@@ -21,6 +21,8 @@ pub enum MemRegister {
 	IE = 0xFFFF,		// interrupt enable
 	IF = 0xFF0F,		// interrupt flag
 
+	LY = 0xFF44			// Line counter register
+
 	// TODO add other registers as they as needed
 }
 
@@ -32,6 +34,7 @@ pub struct Bus {
 	pub timer: Timer,
 	pub ppu: PPU,
 	
+	dma_src: u8,
 
 	wram: [u8; 0x8000],
 	hram: [u8; 0x7F],
@@ -64,6 +67,8 @@ impl Bus {
 			timer: Timer::new(Rc::clone(&intf)),
 			ppu: PPU::new(Rc::clone(&intf)),
 
+			dma_src: 0,
+
 			wram: [0; 0x8000],
 			hram: [0; 0x7F],
 		}
@@ -79,7 +84,10 @@ impl Bus {
 			/* PPU addresses */
 			0x8000			..= 0x9FFF => self.ppu.read(addr),
 			0xFE00			..=	0xFE9F => self.ppu.read(addr),
-			0xFF40 | 0xFF41 | 0xFF44 | 0xFF45 | 0xFF47 => self.ppu.read(addr),
+
+			0xFF46			=> self.dma_src,
+
+			0xFF40 			..= 0xFF4B => self.ppu.read(addr),
 			
 			0xFF04			..= 0xFF07 => self.timer.read(addr),
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().read(addr),
@@ -102,8 +110,8 @@ impl Bus {
 			/* PPU addresses */
 			0x8000			..= 0x9FFF => self.ppu.write(addr, write),
 			0xFE00			..=	0xFE9F => self.ppu.write(addr, write),
-			0xFF40 | 0xFF41 | 0xFF45 => self.ppu.write(addr, write),
 			0xFF46 => self.dma_transfer(write),
+			0xFF40			..= 0xFF4B => self.ppu.write(addr, write),
 
 			0xFF04			..= 0xFF07 => self.timer.write(addr, write),
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().write(addr, write),
@@ -123,6 +131,8 @@ impl Bus {
 	}
 
 	pub fn dma_transfer(&mut self, src: u8) {
+
+		self.dma_src = src;
 
 		let addr: u16 = (src as u16) << 8;	// addr is src * 100
 

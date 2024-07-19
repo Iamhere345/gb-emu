@@ -23,7 +23,10 @@ impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
 
 		let mut emu = Gameboy::new();
-		emu.init(include_bytes!("../../dmg_bootrom.gb"));
+		//emu.init(include_bytes!("../../dmg_bootrom.gb"));
+		emu.init(include_bytes!("../../hello-world.gb"));
+		//emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
+		//emu.init(include_bytes!("../../tests/cpu_instrs/cpu_instrs.gb"));
 
 		Self {
 			emu: emu,
@@ -45,10 +48,8 @@ impl App for Debugger {
 			let mut frames = self.last_update.elapsed().as_secs_f64();
 
 			while frames >= 1.0 / 60.0 {
-				for i in 0..CYCLES_PER_FRAME {
-					for _ in 0..self.control.speed {
-						self.emu.tick();
-					}
+				for _ in 0..CYCLES_PER_FRAME * self.control.speed as usize {
+					self.emu.tick();
 				}
 
 				frames -= CYCLES_PER_FRAME as f64;
@@ -78,6 +79,16 @@ impl App for Debugger {
 		
 		egui::CentralPanel::default().show(ctx, |ui| {
 			self.display.show(ctx, ui, &mut self.emu)
+		});
+
+		egui::SidePanel::right("right_pannel").show(ctx, |ui| {
+
+			ui.strong("VRAM Viewer");
+
+			ui.separator();
+
+			self.ppu.vram_viewer(ctx, ui, &mut self.emu);
+
 		});
 		
 		ctx.request_repaint();

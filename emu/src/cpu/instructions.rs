@@ -416,7 +416,7 @@ fn JR_COND_E8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 
 	set_debug_str(cpu, "e8", format!("{}", offset));
 
-	let new_pc: u16 = (((cpu.pc + 1) as i16) + offset as i16) as u16;
+	let new_pc: u16 = (((cpu.pc.wrapping_add(1)) as i16).wrapping_add(offset as i16)) as u16;
 
 	if !jump {
 		cpu.pc = cpu.pc.wrapping_add(1);
