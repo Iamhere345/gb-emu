@@ -33,8 +33,9 @@ fn main() {
     let mut event_pump = sdl_ctx.event_pump().unwrap();
 
     let mut emu = Gameboy::new();
-    //emu.init(include_bytes!("../../dmg-acid2.gb"));
-    emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
+    emu.init(include_bytes!("../../dmg-acid2.gb"));
+    //emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
+    //emu.init(include_bytes!("../../tests/cpu_instrs/cpu_instrs.gb"));
 
     let mut last_update = Instant::now();
 

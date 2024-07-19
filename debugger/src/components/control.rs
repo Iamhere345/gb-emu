@@ -5,6 +5,7 @@ use emu::Gameboy;
 pub struct Control {
 	pub paused: bool,
 	pub speed: u8,
+	pub scale: usize,
 }
 
 impl Control {
@@ -13,6 +14,7 @@ impl Control {
 		Self {
 			paused: true,
 			speed: 1,
+			scale: 2,
 		}
 	}
 
@@ -27,6 +29,15 @@ impl Control {
 
 			if ui.button(format!("Speed: {}x", self.speed)).clicked() {
 				self.speed = match self.speed {
+					1 => 2,
+					2 => 4,
+					4 => 8,
+					_ => 1
+				}
+			}
+
+			if ui.button(format!("Scale: {}x", self.scale)).clicked() {
+				self.scale = match self.scale {
 					1 => 2,
 					2 => 4,
 					4 => 8,

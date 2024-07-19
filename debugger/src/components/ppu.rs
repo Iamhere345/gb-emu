@@ -21,12 +21,13 @@ impl Ppu {
 		ui.monospace(format!("Line dots: {}", emu.bus.borrow().ppu.line_dots));
 
 		ui.horizontal(|ui| {
-			ui.monospace(format!("LY: {}", emu.bus.borrow_mut().read_byte(0xFF44)));
-			ui.monospace(format!("LYC: {}", emu.bus.borrow_mut().read_byte(0xFF45)));
+			ui.monospace(format!("LY: {}", emu.bus.borrow().read_byte(0xFF44)));
+			ui.monospace(format!("LYC: {}", emu.bus.borrow().read_byte(0xFF45)));
 		});
 
-		ui.monospace(format!("STAT: {:b}", emu.bus.borrow_mut().read_byte(0xFF41)));
-		ui.monospace(format!("LCDC: {:b}", emu.bus.borrow_mut().read_byte(0xFF40)));
+		ui.monospace(format!("STAT: {:b}", emu.bus.borrow().read_byte(0xFF41)));
+		ui.monospace(format!("LCDC: {:b}", emu.bus.borrow().read_byte(0xFF40)));
+		ui.monospace(format!("BGP:  {:b}", emu.bus.borrow().read_byte(0xFF47)));
 
 	}
 
