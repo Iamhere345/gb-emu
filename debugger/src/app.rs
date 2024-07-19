@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use eframe::{egui, App};
+use eframe::{egui::{self, Frame, Stroke, Style}, App};
 
 use emu::Gameboy;
 
@@ -23,8 +23,8 @@ impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
 
 		let mut emu = Gameboy::new();
-		//emu.init(include_bytes!("../../dmg_bootrom.gb"));
-		emu.init(include_bytes!("../../hello-world.gb"));
+		emu.init(include_bytes!("../../dmg-acid2.gb"));
+		//emu.init(include_bytes!("../../hello-world.gb"));
 		//emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
 		//emu.init(include_bytes!("../../tests/cpu_instrs/cpu_instrs.gb"));
 
@@ -43,55 +43,54 @@ impl Debugger {
 
 impl App for Debugger {
 	fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-
+		
 		if self.last_update.elapsed() >= Duration::from_secs_f64(1.0 / 60.0) && !self.control.paused {
 			let mut frames = self.last_update.elapsed().as_secs_f64();
-
+			
 			while frames >= 1.0 / 60.0 {
 				for _ in 0..CYCLES_PER_FRAME * self.control.speed as usize {
 					self.emu.tick();
 				}
-
+				
 				frames -= CYCLES_PER_FRAME as f64;
 			}
-
+			
 			self.last_update = Instant::now();
 		}
-
+		
 		egui::SidePanel::left("left_pannel").show(ctx, |ui| {
-
+			
 			ui.heading("gb-emu");
-
+			
 			ui.separator();
-
+			
 			self.control.show(ctx, ui, &mut self.emu);
-
+			
 			ui.separator();
-
+			
 			self.cpu.show(ctx, ui, &mut self.emu);
-
+			
 			ui.separator();
-
+			
 			self.ppu.show(ctx, ui, &mut self.emu)
 
 		});
-
 		
-		egui::CentralPanel::default().show(ctx, |ui| {
-			self.display.show(ctx, ui, &mut self.emu)
+		egui::SidePanel::right("right_pannel").show(ctx, |ui| {
+			
+			ui.strong("VRAM Viewer");
+			
+			ui.separator();
+			
+			self.ppu.vram_viewer(ctx, ui, &mut self.emu);
+			
 		});
 
-		egui::SidePanel::right("right_pannel").show(ctx, |ui| {
-
-			ui.strong("VRAM Viewer");
-
-			ui.separator();
-
-			self.ppu.vram_viewer(ctx, ui, &mut self.emu);
-
+		egui::CentralPanel::default().show(ctx, |ui| {
+			self.display.show(ctx, ui, &mut self.emu, self.control.scale)
 		});
 		
 		ctx.request_repaint();
-
+		
 	}
 }

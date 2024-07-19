@@ -33,7 +33,6 @@ struct LCDC {
 	bg_enable: bool				// 0: bg and window are disabled (even if window_enable is 1)
 }
 
-// FIXME reading and writing don't seem to work; rewrite.
 impl LCDC {
 
 	pub fn new(initial_write: u8) -> Self {
@@ -138,9 +137,9 @@ impl Palette {
 
 	pub fn read(&self) -> u8 {
 		self.id_0 as u8
-			| self.id_1 as u8 >> 2
-			| self.id_2 as u8 >> 4
-			| self.id_3 as u8 >> 6
+			| (self.id_1 as u8) << 2
+			| (self.id_2 as u8) << 4
+			| (self.id_3 as u8) << 6
 	}
 
 	pub fn write(&mut self, write: u8) {
@@ -363,9 +362,8 @@ impl PPU {
 				true => self.reg_wx.wrapping_sub(x) % 8,
 				false => 7 - (x_pos % 8),		// the 7 is there to swap which bit is selected
 			};
-			
-			// FIXME
-			let pal_id = (data_1 & (1 << pixel_index) >> pixel_index) | (data_2 & (1 << pixel_index) >> pixel_index) << 1;
+
+			let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
 
 			self.pixel_buf[x as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
 
@@ -384,7 +382,7 @@ impl PPU {
 
 				for pixel in 0..8 {
 
-					let pal_id = (data_1 & (1 << pixel) >> pixel) | (data_2 & (1 << pixel) >> pixel) << 1;
+					let pal_id = (data_1 >> pixel & 1) | (data_2 >> pixel & 1) << 1;
 
 					self.tile_data_buf[tile as usize][(pixel + 8 * tile_offset) as usize] = self.reg_bgp.get_pal_value(pal_id);
 
