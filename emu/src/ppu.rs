@@ -33,6 +33,7 @@ struct LCDC {
 	bg_enable: bool				// 0: bg and window are disabled (even if window_enable is 1)
 }
 
+// FIXME reading and writing don't seem to work; rewrite.
 impl LCDC {
 
 	pub fn new(initial_write: u8) -> Self {
@@ -110,18 +111,20 @@ struct Palette {
 
 impl Palette {
 
-	pub fn new() -> Self {
-		Self {
+	pub fn new(initial_write: u8) -> Self {
+		let mut pal = Self {
 			id_0: GBColour::White,
 			id_1: GBColour::LightGrey,
 			id_2: GBColour::DarkGrey,
 			id_3: GBColour::Black,
-		}
+		};
+
+		pal.write(initial_write);
+
+		return pal;
 	}
 
 	pub fn get_pal_value(&self, id: u8) -> GBColour {
-
-
 
 		match id {
 			0 => self.id_0,
@@ -145,8 +148,6 @@ impl Palette {
 		self.id_1 = GBColour::from((write >> 2) & 0b11);
 		self.id_2 = GBColour::from((write >> 4) & 0b11);
 		self.id_3 = GBColour::from((write >> 6) & 0b11);
-
-		println!("write pal");
 	}
 
 }
@@ -165,14 +166,18 @@ pub struct PPU {
 	reg_lyc: u8,        // 0xFF45: if lyc == ly and LYC=LY in STAT register set, raise interrupt
 	reg_stat: u8,		// 0xFF41: LCD status register. Can be used to raise interrupts at various stages of rendering
 	reg_lcdc: LCDC,		// 0xFF40: LCD control register. Can be used to alter the behaviour of the LCD and PPU
+	
 	reg_bgp: Palette,	// 0xFF47: Background palette
+	reg_obp0: Palette,	// 0xFF48: Object palette 0
+	reg_obp1: Palette,	// 0xFF49: Object palette 1
 
 	pub line_dots: i32, // amount of dots that has passed; reset each line.
 
-	vram: [u8; 0x2000], // 8k
+	pub vram: [u8; 0x2000], // 8k
 	oam: [u8; 160],
 
-	pub pixel_buf: [GBColour; 144 * 160]
+	pub pixel_buf: [GBColour; 144 * 160],
+	pub tile_data_buf: Vec<[GBColour; 8 * 8]>
 }
 
 impl PPU {
@@ -190,16 +195,21 @@ impl PPU {
 
 			reg_ly: 0,
 			reg_lyc: 0,
-			reg_stat: 0,
-			reg_lcdc: LCDC::new(0),
-			reg_bgp: Palette::new(),
+			reg_stat: 0x85,
+			reg_lcdc: LCDC::new(0x91),
+
+			reg_bgp: Palette::new(0xFC),
+			reg_obp0: Palette::new(0),
+			reg_obp1: Palette::new(0),
 
 			line_dots: 0,
 
 			vram: [0; 0x2000],
 			oam: [0; 160],
 
-			pixel_buf: [GBColour::LightGrey; 144 * 160]
+			pixel_buf: [GBColour::LightGrey; 144 * 160],
+
+			tile_data_buf: vec![[GBColour::Black; 8 * 8]; 384],
 		}
 	}
 
@@ -301,22 +311,41 @@ impl PPU {
 
 	fn draw_tiles(&mut self) {
 
-		// get tile data area base address (from lcdc tile_data_area)
 		let (tile_data_area, sign): (u16, bool) = match self.reg_lcdc.tile_data_area {
 			false => (0x8800, true),
 			true => (0x8000, false),
 		};
 
-		// get tilemap area (from lcdc bg_tilemap_area)
-		let tilemap_area: u16 = match self.reg_lcdc.bg_tilemap_area {
-			false => 0x9800,
-			true => 0x9C00,
-		};
-
 		for x in 0..160 {
 
+			let in_window = self.reg_lcdc.window_enable && self.reg_ly >= self.reg_wy && x >= self.reg_wx.wrapping_sub(7);
+
+			let y_pos = match in_window {
+				true => self.reg_ly.wrapping_sub(self.reg_wy),
+				false => self.reg_ly.wrapping_add(self.reg_scy)
+			};
+
+			let x_pos = match in_window {
+				true => x.wrapping_sub(self.reg_wx).wrapping_sub(7),
+				false => x.wrapping_add(self.reg_scx)
+			};
+
+			let tilemap_area: u16 = match in_window {
+				false => match self.reg_lcdc.bg_tilemap_area {
+					false => 0x9800,
+					true => 0x9C00,
+				},
+				true => match self.reg_lcdc.window_tilemap_area {
+					false => 0x9800,
+					true => 0x9C00,
+				}
+			};
+
 			// get tile id
-			let tile_id = self.read(tilemap_area + ((self.reg_ly as u16 / 8) * 32) + (x / 8));		
+			let tile_id = match in_window {
+				true => self.read(tilemap_area + ((y_pos as u16 / 8) * 32) + (x_pos / 8) as u16),
+				false => self.read(tilemap_area + ((y_pos as u16 / 8) * 32) + (x_pos / 8) as u16),
+			};
 
 			// get tile data base address
 			let tile_base_addr = match sign {
@@ -324,17 +353,44 @@ impl PPU {
 				true => tile_data_area.wrapping_add(((tile_id as i8) as u16).wrapping_mul(16)),
 			};
 
-			let tile_addr_offset = (self.reg_ly % 8) as u16 * 2;
+			let tile_addr_offset = (y_pos % 8) as u16 * 2;
 
 			let data_1 = self.read(tile_base_addr + tile_addr_offset);
 			let data_2 = self.read(tile_base_addr + tile_addr_offset + 1);
 
 			// the index of the tiles used to form the palette id for this pixel
-			let pixel_index = 7 - (x % 8);		// the 7 is there to swap which bit is selected
+			let pixel_index = match in_window {
+				true => self.reg_wx.wrapping_sub(x) % 8,
+				false => 7 - (x_pos % 8),		// the 7 is there to swap which bit is selected
+			};
 			
+			// FIXME
 			let pal_id = (data_1 & (1 << pixel_index) >> pixel_index) | (data_2 & (1 << pixel_index) >> pixel_index) << 1;
 
 			self.pixel_buf[x as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
+
+		}
+
+	}
+
+	pub fn draw_tile_data(&mut self) {
+
+		for tile in 0..384_u16 {
+			
+			for tile_offset in 0..8_u16 {
+
+				let data_1 = self.read(0x8000 + tile * 16 + (tile_offset * 2));
+				let data_2 = self.read(0x8000 + tile * 16 + (tile_offset * 2 + 1));
+
+				for pixel in 0..8 {
+
+					let pal_id = (data_1 & (1 << pixel) >> pixel) | (data_2 & (1 << pixel) >> pixel) << 1;
+
+					self.tile_data_buf[tile as usize][(pixel + 8 * tile_offset) as usize] = self.reg_bgp.get_pal_value(pal_id);
+
+				}
+
+			}
 
 		}
 
@@ -352,9 +408,11 @@ impl PPU {
 			0xFF44 => self.reg_ly,
 			0xFF45 => self.reg_lyc,
 			0xFF47 => self.reg_bgp.read(),
+			0xFF48 => self.reg_obp0.read(),
+			0xFF49 => self.reg_obp1.read(),
 			0xFF4A => self.reg_wy,
 			0xFF4B => self.reg_wx,
-			_ => panic!("invalid ppu read address")
+			_ => panic!("invalid ppu read address 0x{:X}", addr)
 		}
 	}
 
@@ -367,11 +425,14 @@ impl PPU {
 			0xFF41 => self.reg_stat = write & (self.reg_stat & 0b111),
 			0xFF42 => self.reg_scy = write,
 			0xFF43 => self.reg_scx = write,
+			0xFF44 => {},
 			0xFF45 => self.reg_lyc = write,
 			0xFF47 => self.reg_bgp.write(write),
+			0xFF48 => self.reg_obp0.write(write),
+			0xFF49 => self.reg_obp1.write(write),
 			0xFF4A => self.reg_wy = write,
 			0xFF4B => self.reg_wx = write,
-			_ => panic!("invalid ppu write address")
+			_ => panic!("invalid ppu write address 0x{:X}", addr)
 		}
 	}
 

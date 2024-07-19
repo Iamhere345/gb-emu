@@ -12,31 +12,31 @@ impl Cpu {
 
 	pub fn show(&mut self, ctx: &Context, ui: &mut Ui, emu: &mut Gameboy) {
 
-		ui.label("CPU");
+		ui.strong("CPU");
 
 		ui.horizontal(|ui| {
 
-			ui.label(format!("AF: 0x{:04X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::AF)));
-			ui.label(format!("BC: 0x{:04X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::BC)));
-			ui.label(format!("DE: 0x{:04X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::DE)));
-			ui.label(format!("HL: 0x{:04X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::HL)));
+			ui.monospace(format!("AF: 0x{:04X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::AF)));
+			ui.monospace(format!("BC: 0x{:04X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::BC)));
+			ui.monospace(format!("DE: 0x{:04X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::DE)));
+			ui.monospace(format!("HL: 0x{:04X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::HL)));
 
 		});
 
 		ui.horizontal(|ui| {
 
-			ui.label(format!("SP: 0x{:X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::SP)));
-			ui.label(format!("PC: 0x{:X}", emu.cpu.pc));
+			ui.monospace(format!("SP: 0x{:X}", emu.cpu.registers.get_16bit_reg(emu::cpu::registers::Register16Bit::SP)));
+			ui.monospace(format!("PC: 0x{:X}", emu.cpu.pc));
 
-			ui.label(format!("[HL]: 0x{:X}", emu.cpu.get_8bit_reg(emu::cpu::registers::Register8Bit::HL)));
+			ui.monospace(format!("[HL]: 0x{:X}", emu.cpu.get_8bit_reg(emu::cpu::registers::Register8Bit::HL)));
 
-			ui.label(format!("Cycles: {}", emu.cycles));
+			ui.monospace(format!("Cycles: {}", emu.cycles));
 
 		});
 
 		ui.horizontal(|ui| {
 
-			ui.label(format!("Flags: {}{}{}{}", 
+			ui.monospace(format!("Flags: {}{}{}{}", 
 				if emu.cpu.registers.get_flag(cpu::registers::Flag::Z) { "Z" } else { "_" },
 				if emu.cpu.registers.get_flag(cpu::registers::Flag::N) { "N" } else { "_" },
 				if emu.cpu.registers.get_flag(cpu::registers::Flag::H) { "H" } else { "_" },
@@ -45,7 +45,7 @@ impl Cpu {
 
 		});
 
-		ui.label(format!("Executed Instruction: {}", emu.cpu.last_instruction));
+		ui.monospace(format!("Executed Instruction: {}", emu.cpu.last_instruction));
 
 	}
 

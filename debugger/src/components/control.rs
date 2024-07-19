@@ -18,7 +18,7 @@ impl Control {
 
 	pub fn show(&mut self, ctx: &Context, ui: &mut Ui, emu: &mut Gameboy) {
 		
-		ui.label("Control");
+		ui.strong("Control");
 		
 		ui.horizontal(|ui| {
 			if ui.button(if self.paused == true { "Start" } else { "Stop" }).clicked() {
@@ -38,7 +38,8 @@ impl Control {
 				for _ in 0..self.speed {
 					emu.tick();
 				}
-			};
+			}
+
 		});
 	}
 

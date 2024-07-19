@@ -148,33 +148,6 @@ impl CPU {
 
 		return 0;
 	}
-
-	pub fn _interrupt(&mut self, flag: InterruptFlag, source: InterruptSource) {
-
-		// assumes the corresponding IE bit is true
-		// interrupts are checked before the next instruction is executed
-
-		//println!("INTERRUPT (last instruction: {})", self.current_instruction);
-
-		if self.halted { 
-			self.halted = false;
-
-			return
-		}
-		
-		// clear the bit in IF
-		let new_if = self.bus.borrow().read_register(MemRegister::IF) & !(flag as u8);
-		self.bus.borrow_mut().write_register(MemRegister::IF, new_if);
-
-
-		self.ime = false;
-
-		self.push16(self.pc);
-		self.pc = source as u16;
-
-		self.instr_cycles = 25; // 5 M-cycles
-
-	}
 	
 	pub fn push16(&mut self, to_push: u16) {
 		let mut target_addr = self.dec_sp();

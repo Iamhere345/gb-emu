@@ -1,7 +1,9 @@
 use cpu::*;
 use bus::Bus;
+use cpu::registers::{Register8Bit, Register16Bit};
 
 use std::cell::RefCell;
+use std::io::{self, Write};
 use std::rc::Rc;
 
 pub mod cpu;
@@ -37,7 +39,7 @@ impl Gameboy {
 			self.bus.borrow_mut().write_byte(i.try_into().unwrap(), *byte)
 		}
 
-		self.cpu.pc = 0x0;
+		self.cpu.pc = 0x100;
 
 		// temp
 		/*
@@ -76,26 +78,23 @@ impl Gameboy {
 		self.bus.borrow_mut().timer.tick(instr_cycles);
 		self.bus.borrow_mut().ppu.tick(instr_cycles);
 
+		/*
+		if self.cpu.pc == 0xCB35 {
+			io::stdout().write_all(&self.bus.borrow().ppu.vram).unwrap();
+			io::stdout().flush().unwrap();
+
+			panic!("done");
+		}
+		*/
+
 		if self.bus.borrow().read_byte(0xFF02) == 0x81 {
 
 			let serial_char: char = self.bus.borrow().read_byte(0xFF01) as char;
 
-			print!("{}", serial_char);
+			//print!("{}", serial_char);
 
 			self.bus.borrow_mut().write_byte(0xFF02, 0);
 		}
-
-	}
-
-	pub fn run_frame(&mut self) {
-
-		while !self.bus.borrow().intf.borrow().is_raised(interrupt::InterruptFlag::VBlank) {
-
-			self.tick();
-
-		}
-
-		self.bus.borrow_mut().intf.borrow_mut().clear(interrupt::InterruptFlag::VBlank);
 
 	}
 
