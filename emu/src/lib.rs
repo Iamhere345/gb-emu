@@ -33,7 +33,7 @@ impl Gameboy {
 
 	}
 
-	pub fn init(&mut self, cart: &'static [u8]) {
+	pub fn init(&mut self, cart: &Vec<u8>) {
 
 		for (i, byte) in cart.iter().enumerate() {
 			self.bus.borrow_mut().write_byte(i.try_into().unwrap(), *byte)
@@ -94,6 +94,16 @@ impl Gameboy {
 			//print!("{}", serial_char);
 
 			self.bus.borrow_mut().write_byte(0xFF02, 0);
+		}
+
+	}
+
+	pub fn run_scanline(&mut self) {
+
+		let current_ly = self.bus.borrow().read_register(bus::MemRegister::LY);
+
+		while self.bus.borrow().read_register(bus::MemRegister::LY) != current_ly.wrapping_add(1) {
+			self.tick();
 		}
 
 	}
