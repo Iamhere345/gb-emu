@@ -2,6 +2,7 @@ use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
+use std::fs;
 use std::time::{Duration, Instant};
 
 use emu::Gameboy;
@@ -33,9 +34,11 @@ fn main() {
     let mut event_pump = sdl_ctx.event_pump().unwrap();
 
     let mut emu = Gameboy::new();
-    emu.init(include_bytes!("../../dmg-acid2.gb"));
+    //emu.init(include_bytes!("../../dmg-acid2.gb"));
     //emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
     //emu.init(include_bytes!("../../tests/cpu_instrs/cpu_instrs.gb"));
+
+    emu.init(&fs::read("dmg-acid2.gb").unwrap());
 
     let mut last_update = Instant::now();
 

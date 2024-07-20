@@ -1,6 +1,6 @@
-use std::time::{Duration, Instant};
+use std::{fs, time::{Duration, Instant}};
 
-use eframe::{egui::{self, Frame, Stroke, Style}, App};
+use eframe::{egui::{self, Frame, Stroke, Style, TextBuffer}, App};
 
 use emu::Gameboy;
 
@@ -23,10 +23,10 @@ impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
 
 		let mut emu = Gameboy::new();
-		emu.init(include_bytes!("../../dmg-acid2.gb"));
-		//emu.init(include_bytes!("../../hello-world.gb"));
-		//emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
-		//emu.init(include_bytes!("../../tests/cpu_instrs/cpu_instrs.gb"));
+
+		let cart = fs::read("roms/dmg-acid2.gb").unwrap();
+
+		emu.init(&cart);
 
 		Self {
 			emu: emu,

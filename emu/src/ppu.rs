@@ -65,8 +65,6 @@ impl LCDC {
 
 	pub fn write(&mut self, write: u8) {
 
-		//println!("write lcdc {:b}", write);
-
 		self.bg_enable		 		= write & 0x01 != 0;
 		self.obj_enable				= write & 0x02 != 0;
 		self.obj_size 				= write & 0x04 != 0;
@@ -259,11 +257,15 @@ impl PPU {
 
 			// LYC
 			if self.reg_ly == self.reg_lyc {
+
 				self.reg_stat |= StatFlag::LYCcmp as u8;
 
 				if self.reg_stat & StatFlag::LYCInt as u8 != 0 {
 					self.intf.borrow_mut().raise(InterruptFlag::LCDC);
 				}
+
+			} else {
+				self.reg_stat &= !(StatFlag::LYCcmp as u8);
 			}
 
 			// VBlank
@@ -292,7 +294,7 @@ impl PPU {
 		}
 
 		// update stat register for potentially new rendering mode
-		self.reg_stat = self.reg_stat & self.rendering_mode as u8;
+		self.reg_stat = (self.reg_stat & !0x3) | self.rendering_mode as u8;
 
 	}
 
@@ -300,6 +302,10 @@ impl PPU {
 
 		if self.reg_lcdc.bg_enable {
 			self.draw_tiles()
+		} else {
+			for x in 0..160 {
+				self.pixel_buf[x + 160 * self.reg_ly as usize] = GBColour::White;
+			}
 		}
 
 		if self.reg_lcdc.obj_enable {
@@ -308,6 +314,7 @@ impl PPU {
 
 	}
 
+	// TODO window isn't working
 	fn draw_tiles(&mut self) {
 
 		let (tile_data_area, sign): (u16, bool) = match self.reg_lcdc.tile_data_area {
@@ -420,7 +427,7 @@ impl PPU {
 			0xFE00..=0xFE9F => self.oam[(addr - 0xFE00) as usize] = write,
 
 			0xFF40 => self.reg_lcdc.write(write),
-			0xFF41 => self.reg_stat = write & (self.reg_stat & 0b111),
+			0xFF41 => self.reg_stat = write & !(self.reg_stat & 0b111), // PPUmode and LY=LYC are read only
 			0xFF42 => self.reg_scy = write,
 			0xFF43 => self.reg_scx = write,
 			0xFF44 => {},

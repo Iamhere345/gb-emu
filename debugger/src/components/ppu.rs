@@ -25,9 +25,9 @@ impl Ppu {
 			ui.monospace(format!("LYC: {}", emu.bus.borrow().read_byte(0xFF45)));
 		});
 
-		ui.monospace(format!("STAT: {:b}", emu.bus.borrow().read_byte(0xFF41)));
-		ui.monospace(format!("LCDC: {:b}", emu.bus.borrow().read_byte(0xFF40)));
-		ui.monospace(format!("BGP:  {:b}", emu.bus.borrow().read_byte(0xFF47)));
+		ui.monospace(format!("STAT: {:#010b}", emu.bus.borrow().read_byte(0xFF41)));
+		ui.monospace(format!("LCDC: {:#010b}", emu.bus.borrow().read_byte(0xFF40)));
+		ui.monospace(format!("BGP:  {:#010b}", emu.bus.borrow().read_byte(0xFF47)));
 
 	}
 
