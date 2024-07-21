@@ -356,7 +356,7 @@ impl PPU {
 			// get tile data base address
 			let tile_base_addr = match sign {
 				false => tile_data_area + tile_id as u16 * 16,
-				true => tile_data_area.wrapping_add(((tile_id as i8) as u16).wrapping_mul(16)),
+				true => tile_data_area.wrapping_add(((tile_id as i16 + 128) as u16).wrapping_mul(16)),
 			};
 
 			let tile_addr_offset = (y_pos % 8) as u16 * 2;
