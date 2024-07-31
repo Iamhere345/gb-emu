@@ -71,7 +71,7 @@ impl Gameboy {
 
 	}
 
-	pub fn tick(&mut self, /*log: &mut BufWriter<File>*/) {
+	pub fn tick(&mut self, /*log: &mut BufWriter<File>*/) -> u64 {
 
 		let instr_cycles = self.cpu.cycle();
 
@@ -95,6 +95,8 @@ impl Gameboy {
 
 			self.bus.borrow_mut().write_byte(0xFF02, 0);
 		}
+
+		instr_cycles
 
 	}
 

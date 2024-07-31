@@ -48,8 +48,11 @@ impl App for Debugger {
 			let mut frames = self.last_update.elapsed().as_secs_f64();
 			
 			while frames >= 1.0 / 60.0 {
-				for _ in 0..CYCLES_PER_FRAME * self.control.speed as usize {
-					self.emu.tick();
+
+				let mut cycles: u64 = 0;
+
+				while cycles < CYCLES_PER_FRAME as u64 * self.control.speed as u64 {
+					cycles += self.emu.tick();
 				}
 				
 				frames -= CYCLES_PER_FRAME as f64;
