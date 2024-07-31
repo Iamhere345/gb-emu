@@ -38,7 +38,7 @@ fn main() {
     //emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
     //emu.init(include_bytes!("../../tests/cpu_instrs/cpu_instrs.gb"));
 
-    emu.init(&fs::read("dmg-acid2.gb").unwrap());
+    emu.init(&fs::read("roms/dmg-acid2.gb").unwrap());
 
     let mut last_update = Instant::now();
 
@@ -61,8 +61,11 @@ fn main() {
 			let mut frames = last_update.elapsed().as_secs_f64();
            
             while frames >= 1.0 / 60.0 {
-				for _ in 0..CYCLES_PER_FRAME {
-					emu.tick();
+
+				let mut cycles: u64 = 0;
+
+				while cycles < CYCLES_PER_FRAME as u64 {
+					cycles += emu.tick();
 				}
 
 				frames -= CYCLES_PER_FRAME as f64;
