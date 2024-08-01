@@ -1,12 +1,24 @@
 use std::{fs, time::{Duration, Instant}};
 
-use eframe::{egui::{self, Frame, Stroke, Style, TextBuffer}, App};
+use eframe::{egui::{self, Frame, Key, Stroke, Style, TextBuffer}, App};
 
 use emu::Gameboy;
+use emu::joypad::*;
 
 use crate::components::{control::Control, cpu::Cpu, ppu::Ppu, display::Display};
 
 const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
+
+const BTN_A: Key 		= Key::Z;
+const BTN_B: Key 		= Key::X;
+const BTN_START: Key 	= Key::Enter;
+const BTN_SELECT: Key 	= Key::Backspace;
+
+const DPAD_UP: Key 		= Key::ArrowUp;
+const DPAD_DOWN: Key 	= Key::ArrowDown;
+const DPAD_LEFT: Key 	= Key::ArrowLeft;
+const DPAD_RIGHT: Key 	= Key::ArrowRight;
+
 
 pub struct Debugger {
 	emu: Gameboy,
@@ -44,6 +56,21 @@ impl Debugger {
 impl App for Debugger {
 	fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
 		
+		ctx.input(|input| {
+
+			let joypad = &mut self.emu.bus.borrow_mut().joypad;
+
+			if input.key_down(BTN_A) { joypad.btn_down(GBInput::BtnA) } else { joypad.btn_up(GBInput::BtnA) }
+			if input.key_down(BTN_B) { joypad.btn_down(GBInput::BtnB) } else { joypad.btn_up(GBInput::BtnB) }
+			if input.key_down(BTN_SELECT) { joypad.btn_down(GBInput::BtnSelect) } else { joypad.btn_up(GBInput::BtnSelect) }
+			if input.key_down(BTN_START) { joypad.btn_down(GBInput::BtnStart) } else { joypad.btn_up(GBInput::BtnStart) }
+			if input.key_down(DPAD_UP) { joypad.btn_down(GBInput::DPadUp) } else { joypad.btn_up(GBInput::DPadUp) }
+			if input.key_down(DPAD_DOWN) { joypad.btn_down(GBInput::DPadDown) } else { joypad.btn_up(GBInput::DPadDown) }
+			if input.key_down(DPAD_LEFT) { joypad.btn_down(GBInput::DPadLeft) } else { joypad.btn_up(GBInput::DPadLeft) }
+			if input.key_down(DPAD_RIGHT) { joypad.btn_down(GBInput::DPadRight) } else { joypad.btn_up(GBInput::DPadRight) }
+
+		});
+
 		if self.last_update.elapsed() >= Duration::from_secs_f64(1.0 / 60.0) && !self.control.paused {
 			let mut frames = self.last_update.elapsed().as_secs_f64();
 			
@@ -60,7 +87,7 @@ impl App for Debugger {
 			
 			self.last_update = Instant::now();
 		}
-		
+
 		egui::SidePanel::left("left_pannel").show(ctx, |ui| {
 			
 			ui.heading("gb-emu");

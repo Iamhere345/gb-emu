@@ -22,7 +22,7 @@ impl Control {
 			speed: 1,
 			scale: 2,
 			rom_path: "roms/dmg-acid2.gb".to_string(),
-			rom_list:  vec!["roms/dmg-acid2.gb", "roms/dmg_bootrom.gb", "roms/hello-world.gb", "roms/tetris.gb", "tests/cpu_instrs/cpu_instrs.gb"],
+			rom_list:  vec!["roms/dmg-acid2.gb", "roms/dmg_bootrom.gb", "roms/hello-world.gb", "roms/tetris.gb", "roms/drmario.gb", "tests/cpu_instrs/cpu_instrs.gb"],
 			rom_index: 0,
 		}
 	}
