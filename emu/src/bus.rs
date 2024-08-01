@@ -4,6 +4,7 @@ use std::rc::Rc;
 use super::timer::Timer;
 use super::interrupt::Interrupt;
 use super::ppu::PPU;
+use super::joypad::Joypad;
 
 // possible off-by-one error
 const ROM_BANK1_START: 		u16	= 0x0;
@@ -41,6 +42,7 @@ pub struct Bus {
 	pub intf: Rc<RefCell<Interrupt>>,
 	pub timer: Timer,
 	pub ppu: PPU,
+	pub joypad: Joypad,
 	
 	dma_src: u8,
 
@@ -74,6 +76,7 @@ impl Bus {
 			intf: Rc::clone(&intf),
 			timer: Timer::new(Rc::clone(&intf)),
 			ppu: PPU::new(Rc::clone(&intf)),
+			joypad: Joypad::new(Rc::clone(&intf)),
 
 			dma_src: 0,
 
@@ -97,6 +100,8 @@ impl Bus {
 			/* PPU addresses */
 			0x8000			..= 0x9FFF => self.ppu.read(addr),
 			0xFE00			..=	0xFE9F => self.ppu.read(addr),
+
+			0xFF00			=> self.joypad.read(),
 
 			0xFF46			=> self.dma_src,
 
@@ -123,7 +128,11 @@ impl Bus {
 			/* PPU addresses */
 			0x8000			..= 0x9FFF => self.ppu.write(addr, write),
 			0xFE00			..=	0xFE9F => self.ppu.write(addr, write),
+
+			0xFF00			=> self.joypad.write(write),
+
 			0xFF46 => self.dma_transfer(write),
+
 			0xFF40			..= 0xFF4B => self.ppu.write(addr, write),
 
 			0xFF04			..= 0xFF07 => self.timer.write(addr, write),

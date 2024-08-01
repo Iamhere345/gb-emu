@@ -38,7 +38,7 @@ fn main() {
     //emu.init(include_bytes!("../../tests/cpu_instrs/individual/04-op r,imm.gb"));
     //emu.init(include_bytes!("../../tests/cpu_instrs/cpu_instrs.gb"));
 
-    emu.init(&fs::read("roms/dmg-acid2.gb").unwrap());
+    emu.init(&fs::read("roms/tetris.gb").unwrap());
 
     let mut last_update = Instant::now();
 
@@ -51,6 +51,57 @@ fn main() {
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running;
                 },
+
+                Event::KeyDown { keycode: Some(Keycode::Z), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_down(emu::joypad::GBInput::BtnA);
+                },
+                Event::KeyDown { keycode: Some(Keycode::X), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_down(emu::joypad::GBInput::BtnB);
+                },
+                Event::KeyDown { keycode: Some(Keycode::Return), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_down(emu::joypad::GBInput::BtnStart);
+                },
+                Event::KeyDown { keycode: Some(Keycode::Backspace), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_down(emu::joypad::GBInput::BtnSelect);
+                },
+                Event::KeyDown { keycode: Some(Keycode::Up), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_down(emu::joypad::GBInput::DPadUp);
+                },
+                Event::KeyDown { keycode: Some(Keycode::Down), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_down(emu::joypad::GBInput::DPadDown);
+                },
+                Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_down(emu::joypad::GBInput::DPadLeft);
+                },
+                Event::KeyDown { keycode: Some(Keycode::Right), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_down(emu::joypad::GBInput::DPadRight);
+                },
+                
+                Event::KeyUp { keycode: Some(Keycode::Z), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_up(emu::joypad::GBInput::BtnA);
+                },
+                Event::KeyUp { keycode: Some(Keycode::X), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_up(emu::joypad::GBInput::BtnB);
+                },
+                Event::KeyUp { keycode: Some(Keycode::Return), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_up(emu::joypad::GBInput::BtnStart);
+                },
+                Event::KeyUp { keycode: Some(Keycode::Backspace), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_up(emu::joypad::GBInput::BtnSelect);
+                },
+                Event::KeyUp { keycode: Some(Keycode::Up), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_up(emu::joypad::GBInput::DPadUp);
+                },
+                Event::KeyUp { keycode: Some(Keycode::Down), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_up(emu::joypad::GBInput::DPadDown);
+                },
+                Event::KeyUp { keycode: Some(Keycode::Left), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_up(emu::joypad::GBInput::DPadLeft);
+                },
+                Event::KeyUp { keycode: Some(Keycode::Right), .. } => {
+                    emu.bus.borrow_mut().joypad.btn_up(emu::joypad::GBInput::DPadRight);
+                },
+
                 _ => {}
             }
 

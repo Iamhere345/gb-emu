@@ -1097,7 +1097,7 @@ fn AND(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 			*cycles = 8;
 
 			let rhs = get_imm8(cpu);
-			set_debug_str(cpu, "imm8", format!("0x{:X}", rhs));
+			set_debug_str(cpu, "n8", format!("0x{:X}", rhs));
 			
 			rhs
 		},
