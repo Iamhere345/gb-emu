@@ -74,12 +74,20 @@ impl App for Debugger {
 		if self.last_update.elapsed() >= Duration::from_secs_f64(1.0 / 60.0) && !self.control.paused {
 			let mut frames = self.last_update.elapsed().as_secs_f64();
 			
+			'update:
 			while frames >= 1.0 / 60.0 {
 
 				let mut cycles: u64 = 0;
 
 				while cycles < CYCLES_PER_FRAME as u64 * self.control.speed as u64 {
 					cycles += self.emu.tick();
+
+					for i in self.control.breakpoints.iter() {
+						if self.emu.cpu.pc == *i {
+							self.control.paused = true;
+							break 'update;
+						}
+					}
 				}
 				
 				frames -= CYCLES_PER_FRAME as f64;

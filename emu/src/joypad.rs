@@ -61,21 +61,22 @@ impl Joypad {
 		Self {
 			intf: intf,
 
-			dpad_state: 0xF,
-			btn_state: 0xF,
+			dpad_state: 0xFF,
+			btn_state: 0xFF,
 			select: 0 
 		}
 	}
 
 	pub fn read(&self) -> u8 {
 
-		println!("read joyp select: 0b{:b} dpad: 0b{:b} btn 0b{:b}", self.select, self.dpad_state, self.btn_state);
+		//println!("read joyp select: 0b{:b} dpad: 0b{:b} btn 0b{:b}", self.select, self.dpad_state, self.btn_state);
+
+		//println!("select:{:#010b} dpad:{:#010b} btn:{:#010b}", self.select, self.dpad_state, self.btn_state);
 
 		match self.select {
 			0b01 => (self.select << 4) | self.dpad_state,
 			0b10 => (self.select << 4) | self.btn_state,
-			0b11 => (self.select << 4) | 0xF,
-			_ 	 => panic!("invalid joyp select value"),
+			_ 	 => (self.select << 4) | 0xF,
 		}
 	}
 

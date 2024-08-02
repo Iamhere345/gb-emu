@@ -12,6 +12,10 @@ pub struct Control {
 	pub rom_path: String,
 	pub rom_list: Vec<&'static str>,
 	pub rom_index: usize,
+
+	pub breakpoints: Vec<u16>,
+	breakpoints_window_open: bool,
+	breakpoint_str: String,
 }
 
 impl Control {
@@ -24,6 +28,9 @@ impl Control {
 			rom_path: "roms/dmg-acid2.gb".to_string(),
 			rom_list:  vec!["roms/dmg-acid2.gb", "roms/dmg_bootrom.gb", "roms/hello-world.gb", "roms/tetris.gb", "roms/drmario.gb", "tests/cpu_instrs/cpu_instrs.gb"],
 			rom_index: 0,
+			breakpoints: Vec::new(),
+			breakpoints_window_open: false,
+			breakpoint_str: String::new(),
 		}
 	}
 
@@ -81,6 +88,54 @@ impl Control {
 				self.reset_emu(emu);
 			}
 
+
+		});
+
+		ui.horizontal(|ui| {
+
+			if ui.button("breakpoints").clicked() {
+				self.breakpoints_window_open = !self.breakpoints_window_open;
+			}
+
+			if self.breakpoints_window_open {
+
+				Window::new("Breakpoints").show(ctx, |ui| {
+
+					let mut removed_breakpoint: Option<usize> = None;
+
+					for (i, breakpoint) in self.breakpoints.iter().enumerate() {
+						ui.horizontal(|ui| {
+
+							ui.label(format!("PC: 0x{:04X}", breakpoint));
+							
+							if ui.button("Remove").clicked() {
+								removed_breakpoint = Some(i);
+							}
+
+						});
+					}
+
+					if let Some(i) = removed_breakpoint {
+						self.breakpoints.remove(i);
+					}
+
+					ui.horizontal(|ui| {
+
+						if ui.text_edit_singleline(&mut self.breakpoint_str).lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+							
+							if let Ok(breakpoint) = u16::from_str_radix(&self.breakpoint_str, 16) {
+								self.breakpoints.push(breakpoint);
+							} else {
+								eprintln!("[ERROR] Unable to parse breakpoint {}", self.breakpoint_str);
+							}
+
+						}
+
+					});
+
+				});
+
+			}
 
 		});
 
