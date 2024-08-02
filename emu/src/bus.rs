@@ -71,7 +71,7 @@ impl Bus {
 		let intf = Rc::new(RefCell::new(Interrupt::default()));
 
 		Bus {
-			memory: [0; 64 * 1024],
+			memory: [0xFF; 64 * 1024],
 
 			intf: Rc::clone(&intf),
 			timer: Timer::new(Rc::clone(&intf)),
@@ -80,8 +80,8 @@ impl Bus {
 
 			dma_src: 0,
 
-			wram: [0; 0x8000],
-			hram: [0; 0x7F],
+			wram: [0xFF; 0x8000],
+			hram: [0xFF; 0x7F],
 		}
 
 	}
@@ -122,7 +122,6 @@ impl Bus {
 		//return;
 
 		match addr {
-			ROM_BANK1_START	..=	ROM_BANK2_END => self.memory[addr as usize] = write,
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize] = write,
 
 			/* PPU addresses */
