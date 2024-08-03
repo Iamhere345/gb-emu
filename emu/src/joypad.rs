@@ -74,8 +74,8 @@ impl Joypad {
 		//println!("select:{:#010b} dpad:{:#010b} btn:{:#010b}", self.select, self.dpad_state, self.btn_state);
 
 		match self.select {
-			0b01 => (self.select << 4) | self.dpad_state,
-			0b10 => (self.select << 4) | self.btn_state,
+			0b10 => (self.select << 4) | self.dpad_state,
+			0b01 => (self.select << 4) | self.btn_state,
 			_ 	 => (self.select << 4) | 0xF,
 		}
 	}

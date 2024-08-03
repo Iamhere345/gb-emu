@@ -28,7 +28,7 @@ pub struct Debugger {
 
 	control: Control,
 	cpu: Cpu,
-	ppu: Ppu
+	ppu: Ppu,
 }
 
 impl Debugger {
@@ -64,6 +64,7 @@ impl App for Debugger {
 			if input.key_down(BTN_B) { joypad.btn_down(GBInput::BtnB) } else { joypad.btn_up(GBInput::BtnB) }
 			if input.key_down(BTN_SELECT) { joypad.btn_down(GBInput::BtnSelect) } else { joypad.btn_up(GBInput::BtnSelect) }
 			if input.key_down(BTN_START) { joypad.btn_down(GBInput::BtnStart) } else { joypad.btn_up(GBInput::BtnStart) }
+
 			if input.key_down(DPAD_UP) { joypad.btn_down(GBInput::DPadUp) } else { joypad.btn_up(GBInput::DPadUp) }
 			if input.key_down(DPAD_DOWN) { joypad.btn_down(GBInput::DPadDown) } else { joypad.btn_up(GBInput::DPadDown) }
 			if input.key_down(DPAD_LEFT) { joypad.btn_down(GBInput::DPadLeft) } else { joypad.btn_up(GBInput::DPadLeft) }
