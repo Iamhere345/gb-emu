@@ -37,7 +37,7 @@ impl Gameboy {
 	pub fn init(&mut self, cart: &Vec<u8>) {
 
 		for (i, byte) in cart.iter().enumerate() {
-			self.bus.borrow_mut().write_byte(i.try_into().unwrap(), *byte)
+			self.bus.borrow_mut().rom[i] = *byte;
 		}
 
 		self.cpu.pc = 0x100;

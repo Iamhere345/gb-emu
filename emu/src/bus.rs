@@ -46,6 +46,7 @@ pub struct Bus {
 	
 	dma_src: u8,
 
+	pub rom: [u8; 0x8000],
 	wram: [u8; 0x8000],
 	hram: [u8; 0x7F],
 
@@ -80,6 +81,7 @@ impl Bus {
 
 			dma_src: 0,
 
+			rom: [0xFF; 0x8000],
 			wram: [0xFF; 0x8000],
 			hram: [0xFF; 0x7F],
 		}
@@ -94,7 +96,7 @@ impl Bus {
 
 			//0x104			..=	0x133 => logo[addr as usize - 0x104],
 
-			ROM_BANK1_START	..=	ROM_BANK1_END => self.memory[addr as usize],
+			ROM_BANK1_START	..=	ROM_BANK2_END => self.rom[addr as usize],
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize],
 
 			/* PPU addresses */
@@ -108,7 +110,7 @@ impl Bus {
 			0xFF40 			..= 0xFF4B => self.ppu.read(addr),
 			
 			0xFF04			..= 0xFF07 => self.timer.read(addr),
-			0xFF0F			|	0xFFFF => self.intf.borrow_mut().read(addr),
+			0xFF0F			|	0xFFFF => self.intf.borrow().read(addr),
 
 			HRAM_START		..= HRAM_END => self.hram[(addr - HRAM_START) as usize],
 			_ => self.memory[addr as usize]
@@ -122,6 +124,9 @@ impl Bus {
 		//return;
 
 		match addr {
+
+			ROM_BANK1_START	..=	ROM_BANK2_END => {},
+
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize] = write,
 
 			/* PPU addresses */
@@ -138,6 +143,7 @@ impl Bus {
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().write(addr, write),
 
 			HRAM_START		..=	HRAM_END => self.hram[(addr - HRAM_START) as usize] = write,
+
 			_ => self.memory[addr as usize] = write,
 		}
 

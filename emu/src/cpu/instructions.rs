@@ -1663,7 +1663,7 @@ fn BIT_U3_R8(cpu: &mut CPU, opcode: u8, cycles: &mut u16) {
 		*cycles = 12;
 	}
 
-	let test_bit = (cpu.get_8bit_reg(r8) >> u3) & 0x1;
+	let test_bit = (cpu.get_8bit_reg(r8)) & (1 << u3);
 
 	cpu.registers.set_flag(Flag::Z, test_bit == 0);
 	cpu.registers.set_flag(Flag::N, false);
