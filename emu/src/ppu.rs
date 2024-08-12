@@ -249,6 +249,11 @@ impl PPU {
 		// new line
 		if self.line_dots >= 456 {
 
+			// draw scanline
+			if self.reg_ly < 144 {
+				self.draw_scanline();
+			}
+
 			let dots_carry = if self.line_dots > 0 { self.line_dots - 456 } else { 0 };
 
 			// go to the next line and reset the line counter
@@ -284,11 +289,6 @@ impl PPU {
 			// end of VBlank
 			if self.reg_ly == 154 {
 				self.reg_ly = 0;
-			}
-
-			// draw scanline
-			if self.reg_ly < 144 {
-				self.draw_scanline();
 			}
 
 		}
@@ -371,6 +371,8 @@ impl PPU {
 			};
 
 			let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
+
+			//println!("{}", self.reg_ly);
 
 			self.pixel_buf[x as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
 
