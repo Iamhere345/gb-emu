@@ -1,8 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::bus;
-
 use super::interrupt::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -318,7 +316,7 @@ impl PPU {
 	fn draw_tiles(&mut self) {
 
 		let (tile_data_area, sign): (u16, bool) = match self.reg_lcdc.tile_data_area {
-			false => (0x8800, true),
+			false => (0x9000, true),	// signed addressing uses 0x9000 as a base pointer
 			true => (0x8000, false),
 		};
 
@@ -349,14 +347,14 @@ impl PPU {
 
 			// get tile id
 			let tile_id = match in_window {
-				true => self.read(tilemap_area + ((y_pos as u16 / 8) * 32) + (x_pos / 8) as u16),
-				false => self.read(tilemap_area + ((y_pos as u16 / 8) * 32) + (x_pos / 8) as u16),
+				true => self.read(tilemap_area + ((y_pos as u16 / 8) * 32) + (x_pos as u16 / 8)),
+				false => self.read(tilemap_area + ((y_pos as u16 / 8) * 32) + (x_pos as u16 / 8)),
 			};
 
 			// get tile data base address
 			let tile_base_addr = match sign {
 				false => tile_data_area + tile_id as u16 * 16,
-				true => tile_data_area.wrapping_add(((tile_id as i16 + 128) as u16).wrapping_mul(16)),
+				true => tile_data_area.wrapping_add(((tile_id as i8) as u16).wrapping_mul(16))
 			};
 
 			let tile_addr_offset = (y_pos % 8) as u16 * 2;
@@ -371,8 +369,6 @@ impl PPU {
 			};
 
 			let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
-
-			//println!("{}", self.reg_ly);
 
 			self.pixel_buf[x as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
 
