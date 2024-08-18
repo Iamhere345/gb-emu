@@ -20,6 +20,37 @@ enum StatFlag {
 	LYCInt		= 0x40,
 }
 
+struct Sprite {
+	pos_y: i16,
+	pos_x: i16,
+	tile_id: u8,
+
+	priority: bool,
+	y_flip: bool,
+	x_flip: bool,
+	palette: bool,
+}
+
+impl Sprite {
+
+	pub fn from_oam(base_addr: u16, oam: &mut [u8; 160]) -> Self {
+
+		let attributes = oam[base_addr as usize + 3];
+
+		Self {
+			pos_y: oam[base_addr as usize] as i16 - 16,
+			pos_x: oam[base_addr as usize + 1] as i16 - 8,
+			tile_id: oam[base_addr as usize + 2],
+
+			priority: 	attributes & 0x80 != 0,
+			y_flip: 	attributes & 0x40 != 0,
+			x_flip:		attributes & 0x20 != 0,
+			palette:	attributes & 0x10 != 0,
+		}
+	}
+
+}
+
 struct LCDC {
 	lcd_enable: bool,			// 0: off 1: on
 	window_tilemap_area: bool,	// 0: 0x9800-0x9BFF 1: 0x9C00-0x9FFF
@@ -216,11 +247,11 @@ impl PPU {
 	pub fn tick(&mut self, cycles: u64) {
 
 		if !self.reg_lcdc.lcd_enable {
-			self.rendering_mode = RenderingMode::VBlank;
+			self.rendering_mode = RenderingMode::HBlank;
 			self.reg_ly = 0;
 			self.line_dots = 0;
 
-			self.reg_stat = 0;
+			self.reg_stat = (self.reg_stat & !0x3) | self.rendering_mode as u8;
 
 			return;
 		}
@@ -255,7 +286,7 @@ impl PPU {
 
 			// update window internal line counter whenever the window is active on a line
 			if self.reg_lcdc.window_enable && self.reg_ly > self.reg_wy && self.reg_wx < 159 + 7 && self.reg_wy < 144 {
-				self.win_ly += 1;
+				self.win_ly = self.win_ly.wrapping_add(1);
 			}
 
 			// draw scanline
@@ -319,7 +350,7 @@ impl PPU {
 		}
 
 		if self.reg_lcdc.obj_enable {
-			// todo
+			self.draw_sprites()
 		}
 
 	}
@@ -382,6 +413,56 @@ impl PPU {
 			let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
 
 			self.pixel_buf[x as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
+
+		}
+
+	}
+
+	pub fn draw_sprites(&mut self) {
+
+		for oam_index in 0..40 {
+
+			let sprite = Sprite::from_oam(oam_index * 4, &mut self.oam);
+			
+			let size_y = match self.reg_lcdc.obj_size {
+				true => 16,
+				false => 8,
+			};
+
+			// is the sprite on this line?
+			if self.reg_ly as i16 >= sprite.pos_y && (self.reg_ly as i16) < (sprite.pos_y + size_y) {
+
+				let sprite_line = (self.reg_ly as i16 - sprite.pos_y) as u16;
+
+				let tile_data_addr = (0x8000 + sprite.tile_id as u16 * 16) + sprite_line * 2;
+
+				let data_1 = self.read(tile_data_addr);
+				let data_2 = self.read(tile_data_addr + 1);
+
+				for x in 0..8 {
+
+					let x_offset = sprite.pos_x + x;
+
+					if x_offset < 0 || x_offset > 160 {
+						continue;
+					}
+
+					let pal = match sprite.palette {
+						false => &self.reg_obp0,
+						true => &self.reg_obp1,
+					};
+
+					let pal_id = (data_1 >> x & 1) | (data_2 >> x & 1) << 1;
+
+					let pal_value = pal.get_pal_value(pal_id);
+
+					if pal_value != GBColour::White {
+						self.pixel_buf[x_offset as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
+					}
+
+				}
+
+			}
 
 		}
 
