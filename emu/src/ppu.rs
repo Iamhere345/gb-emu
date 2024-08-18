@@ -67,10 +67,10 @@ impl LCDC {
 		self.obj_enable				= write & 0x02 != 0;
 		self.obj_size 				= write & 0x04 != 0;
 		self.bg_tilemap_area 		= write & 0x08 != 0;
-		self.tile_data_area 		= write & 0x010 != 0;
-		self.window_enable 			= write & 0x020 != 0;
-		self.window_tilemap_area 	= write & 0x040 != 0;
-		self.lcd_enable 			= write & 0x080 != 0;
+		self.tile_data_area 		= write & 0x10 != 0;
+		self.window_enable 			= write & 0x20 != 0;
+		self.window_tilemap_area 	= write & 0x40 != 0;
+		self.lcd_enable 			= write & 0x80 != 0;
 	}
 
 }
@@ -330,7 +330,7 @@ impl PPU {
 			};
 
 			let x_pos = match in_window {
-				true => x.wrapping_sub(self.reg_wx).wrapping_sub(7),
+				true => x.wrapping_sub(self.reg_wx.wrapping_sub(7)),
 				false => x.wrapping_add(self.reg_scx)
 			};
 
