@@ -166,6 +166,8 @@ pub struct PPU {
 	reg_obp0: Palette,	// 0xFF48: Object palette 0
 	reg_obp1: Palette,	// 0xFF49: Object palette 1
 
+	win_ly: u8,			// window internal line counter
+	
 	pub line_dots: i32, // amount of dots that has passed; reset each line.
 
 	pub vram: [u8; 0x2000], // 8k
@@ -197,6 +199,8 @@ impl PPU {
 			reg_obp0: Palette::new(0),
 			reg_obp1: Palette::new(0),
 
+			win_ly: 0,
+
 			line_dots: 0,
 
 			vram: [0; 0x2000],
@@ -215,6 +219,8 @@ impl PPU {
 			self.rendering_mode = RenderingMode::VBlank;
 			self.reg_ly = 0;
 			self.line_dots = 0;
+
+			self.reg_stat = 0;
 
 			return;
 		}
@@ -246,6 +252,11 @@ impl PPU {
 
 		// new line
 		if self.line_dots >= 456 {
+
+			// update window internal line counter whenever the window is active on a line
+			if self.reg_lcdc.window_enable && self.reg_ly > self.reg_wy && self.reg_wx < 159 + 7 && self.reg_wy < 144 {
+				self.win_ly += 1;
+			}
 
 			// draw scanline
 			if self.reg_ly < 144 {
@@ -287,6 +298,7 @@ impl PPU {
 			// end of VBlank
 			if self.reg_ly == 154 {
 				self.reg_ly = 0;
+				self.win_ly = 0;
 			}
 
 		}
@@ -312,7 +324,6 @@ impl PPU {
 
 	}
 
-	// TODO window isn't working
 	fn draw_tiles(&mut self) {
 
 		let (tile_data_area, sign): (u16, bool) = match self.reg_lcdc.tile_data_area {
@@ -325,7 +336,7 @@ impl PPU {
 			let in_window = self.reg_lcdc.window_enable && self.reg_ly >= self.reg_wy && x >= self.reg_wx.wrapping_sub(7);
 
 			let y_pos = match in_window {
-				true => self.reg_ly.wrapping_sub(self.reg_wy),
+				true => self.win_ly,
 				false => self.reg_ly.wrapping_add(self.reg_scy)
 			};
 
