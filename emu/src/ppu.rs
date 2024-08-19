@@ -128,6 +128,7 @@ impl From<u8> for GBColour {
 
 }
 
+#[derive(Debug)]
 struct Palette {
 	id_0: GBColour,
 	id_1: GBColour,
@@ -418,6 +419,7 @@ impl PPU {
 
 	}
 
+	// TODO sort sprites in buffer
 	pub fn draw_sprites(&mut self) {
 
 		for oam_index in 0..40 {
@@ -432,9 +434,19 @@ impl PPU {
 			// is the sprite on this line?
 			if self.reg_ly as i16 >= sprite.pos_y && (self.reg_ly as i16) < (sprite.pos_y + size_y) {
 
-				let sprite_line = (self.reg_ly as i16 - sprite.pos_y) as u16;
+				// what row of the sprite the scanline intersects with
+				let sprite_line = match sprite.y_flip {
+					false => (self.reg_ly as i16 - sprite.pos_y) as u16,
+					true => (size_y as i16 - 1 - (self.reg_ly as i16 - sprite.pos_y)) as u16,
+				};
 
-				let tile_data_addr = (0x8000 + sprite.tile_id as u16 * 16) + sprite_line * 2;
+				// 8x16 sprites ignore the LSB of the tile id (i.e it becomes every second tile)
+				let tile_mask = match self.reg_lcdc.obj_size {
+					true => 0xFE,
+					false => 0xFF,
+				};
+
+				let tile_data_addr = (0x8000 + (sprite.tile_id & tile_mask) as u16 * 16) + sprite_line * 2;
 
 				let data_1 = self.read(tile_data_addr);
 				let data_2 = self.read(tile_data_addr + 1);
@@ -447,17 +459,27 @@ impl PPU {
 						continue;
 					}
 
+					// TODO test
+					if sprite.priority == true && self.pixel_buf[x_offset as usize + 160 * self.reg_ly as usize] != self.reg_bgp.get_pal_value(0) {
+						continue;
+					}
+
 					let pal = match sprite.palette {
 						false => &self.reg_obp0,
 						true => &self.reg_obp1,
 					};
 
-					let pal_id = (data_1 >> x & 1) | (data_2 >> x & 1) << 1;
+					let pixel_index = match sprite.x_flip {
+						false => 7 - x,
+						true => x,
+					};
+
+					let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
 
 					let pal_value = pal.get_pal_value(pal_id);
 
-					if pal_value != GBColour::White {
-						self.pixel_buf[x_offset as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
+					if pal_id != 0 {
+						self.pixel_buf[x_offset as usize + 160 * self.reg_ly as usize] = pal.get_pal_value(pal_id);
 					}
 
 				}
