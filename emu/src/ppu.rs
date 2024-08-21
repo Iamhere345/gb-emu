@@ -20,6 +20,7 @@ enum StatFlag {
 	LYCInt		= 0x40,
 }
 
+#[derive(Default, Clone, Copy)]
 struct Sprite {
 	pos_y: i16,
 	pos_x: i16,
@@ -33,7 +34,7 @@ struct Sprite {
 
 impl Sprite {
 
-	pub fn from_oam(base_addr: u16, oam: &mut [u8; 160]) -> Self {
+	pub fn from_oam(base_addr: u16, oam: &[u8; 160]) -> Self {
 
 		let attributes = oam[base_addr as usize + 3];
 
@@ -205,6 +206,8 @@ pub struct PPU {
 	pub vram: [u8; 0x2000], // 8k
 	oam: [u8; 160],
 
+	sprite_cache: [Sprite; 40],
+
 	pub pixel_buf: [GBColour; 144 * 160],
 	pub tile_data_buf: Vec<[GBColour; 8 * 8]>
 }
@@ -238,8 +241,9 @@ impl PPU {
 			vram: [0; 0x2000],
 			oam: [0; 160],
 
-			pixel_buf: [GBColour::LightGrey; 144 * 160],
+			sprite_cache: [Sprite::default(); 40],
 
+			pixel_buf: [GBColour::LightGrey; 144 * 160],
 			tile_data_buf: vec![[GBColour::Black; 8 * 8]; 384],
 		}
 	}
@@ -292,6 +296,7 @@ impl PPU {
 
 			// draw scanline
 			if self.reg_ly < 144 {
+				self.cache_all_sprites();
 				self.draw_scanline();
 			}
 
@@ -419,74 +424,111 @@ impl PPU {
 
 	}
 
-	// TODO sort sprites in buffer
 	pub fn draw_sprites(&mut self) {
 
-		for oam_index in 0..40 {
+		let size_y = match self.reg_lcdc.obj_size {
+			true => 16,
+			false => 8,
+		};
 
-			let sprite = Sprite::from_oam(oam_index * 4, &mut self.oam);
-			
-			let size_y = match self.reg_lcdc.obj_size {
-				true => 16,
-				false => 8,
+		let sprites = self.cache_sprites_on_line();
+
+		for sprite in sprites.iter() {
+
+			// what row of the sprite the scanline intersects with
+			let sprite_line = match sprite.y_flip {
+				false => (self.reg_ly as i16 - sprite.pos_y) as u16,
+				true => (size_y as i16 - 1 - (self.reg_ly as i16 - sprite.pos_y)) as u16,
 			};
 
-			// is the sprite on this line?
-			if self.reg_ly as i16 >= sprite.pos_y && (self.reg_ly as i16) < (sprite.pos_y + size_y) {
+			// 8x16 sprites ignore the LSB of the tile id (i.e it becomes every second tile)
+			let tile_mask = match self.reg_lcdc.obj_size {
+				true => 0xFE,
+				false => 0xFF,
+			};
 
-				// what row of the sprite the scanline intersects with
-				let sprite_line = match sprite.y_flip {
-					false => (self.reg_ly as i16 - sprite.pos_y) as u16,
-					true => (size_y as i16 - 1 - (self.reg_ly as i16 - sprite.pos_y)) as u16,
+			let tile_data_addr = (0x8000 + (sprite.tile_id & tile_mask) as u16 * 16) + sprite_line * 2;
+
+			let data_1 = self.read(tile_data_addr);
+			let data_2 = self.read(tile_data_addr + 1);
+
+			for x in 0..8 {
+
+				let x_offset = sprite.pos_x + x;
+
+				if x_offset < 0 || x_offset > 159 {
+					continue;
+				}
+
+				let pixel_buf_index = x_offset as usize + 160 * self.reg_ly as usize;
+
+				if sprite.priority == true && self.pixel_buf[pixel_buf_index] != self.reg_bgp.get_pal_value(0) {
+					continue;
+				}
+
+				let pal = match sprite.palette {
+					false => &self.reg_obp0,
+					true => &self.reg_obp1,
 				};
 
-				// 8x16 sprites ignore the LSB of the tile id (i.e it becomes every second tile)
-				let tile_mask = match self.reg_lcdc.obj_size {
-					true => 0xFE,
-					false => 0xFF,
+				let pixel_index = match sprite.x_flip {
+					false => 7 - x,
+					true => x,
 				};
 
-				let tile_data_addr = (0x8000 + (sprite.tile_id & tile_mask) as u16 * 16) + sprite_line * 2;
+				let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
 
-				let data_1 = self.read(tile_data_addr);
-				let data_2 = self.read(tile_data_addr + 1);
-
-				for x in 0..8 {
-
-					let x_offset = sprite.pos_x + x;
-
-					if x_offset < 0 || x_offset > 160 {
-						continue;
-					}
-
-					// TODO test
-					if sprite.priority == true && self.pixel_buf[x_offset as usize + 160 * self.reg_ly as usize] != self.reg_bgp.get_pal_value(0) {
-						continue;
-					}
-
-					let pal = match sprite.palette {
-						false => &self.reg_obp0,
-						true => &self.reg_obp1,
-					};
-
-					let pixel_index = match sprite.x_flip {
-						false => 7 - x,
-						true => x,
-					};
-
-					let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
-
-					let pal_value = pal.get_pal_value(pal_id);
-
-					if pal_id != 0 {
-						self.pixel_buf[x_offset as usize + 160 * self.reg_ly as usize] = pal.get_pal_value(pal_id);
-					}
-
+				if pal_id != 0 {
+					self.pixel_buf[pixel_buf_index] = pal.get_pal_value(pal_id);
 				}
 
 			}
 
 		}
+
+	}
+
+	pub fn cache_all_sprites(&mut self) {
+
+		for sprite_index in 0..40 {
+			self.sprite_cache[sprite_index] = Sprite::from_oam(sprite_index as u16 * 4, &self.oam)
+		}
+
+	}
+
+	fn cache_sprites_on_line(&mut self) -> Vec<Sprite> {
+
+		let mut sprites_on_line: Vec<Sprite> = Vec::new();
+
+		let size_y = match self.reg_lcdc.obj_size {
+			true => 16,
+			false => 8,
+		};
+
+		for sprite in self.sprite_cache {
+			
+			if self.reg_ly as i16 >= sprite.pos_y && (self.reg_ly as i16) < (sprite.pos_y + size_y) {
+				sprites_on_line.push(sprite.clone());
+			}
+
+		}
+
+		sprites_on_line.truncate(10);
+		
+		// sort sprites by lowest x position (insertion sort)
+		for i in 1..sprites_on_line.len() {
+			let mut j = i;
+			while j > 0 && sprites_on_line[j - 1].pos_x > sprites_on_line[j].pos_x {
+				sprites_on_line.swap(j - 1, j);
+				j -= 1;
+			}
+		}
+
+		// theres probably a more performant way to do this by modifying insertion sort algorithm,
+		// but reversing the order of the sort breaks same x-coordinate priority
+		sprites_on_line.reverse();
+
+		sprites_on_line
 
 	}
 
