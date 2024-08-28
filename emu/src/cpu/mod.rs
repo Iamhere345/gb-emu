@@ -27,7 +27,7 @@ impl CPU {
 		CPU {
 			registers: Registers::new(),
 			bus: bus,
-			pc: 0,
+			pc: 0x100,
 			ime: false,
 			ei: 0,
 			halted: false,

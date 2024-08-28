@@ -63,7 +63,7 @@ impl Control {
 
 			if ui.button("Step").clicked() {
 				for _ in 0..self.speed {
-					emu.tick();
+					emu.cycles += emu.tick();
 				}
 			}
 
@@ -143,13 +143,11 @@ impl Control {
 
 	fn reset_emu(&mut self, emu: &mut Gameboy) {
 
-		*emu = Gameboy::new();
-
 		let rom_open = fs::read(self.rom_path.clone());
 
 		if let Ok(rom) = rom_open {
 
-			emu.init(&rom);
+			*emu = Gameboy::new(rom);
 
 		} else {
 			eprintln!("[ERROR] failed to open rom. Error: {:?}", rom_open.unwrap_err());

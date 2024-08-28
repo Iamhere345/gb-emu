@@ -1,10 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::cart::create_cart;
+
 use super::timer::Timer;
 use super::interrupt::Interrupt;
 use super::ppu::PPU;
 use super::joypad::Joypad;
+use super::cart::MBC;
 
 // possible off-by-one error
 const ROM_BANK1_START: 		u16	= 0x0;
@@ -39,6 +42,8 @@ pub enum MemRegister {
 pub struct Bus {
 	memory: [u8; 64 * 1024],
 
+	pub cart: Box<dyn MBC>,
+
 	pub intf: Rc<RefCell<Interrupt>>,
 	pub timer: Timer,
 	pub ppu: PPU,
@@ -67,11 +72,14 @@ pub struct Bus {
 
 impl Bus {
 
-	pub fn new() -> Self {
+	pub fn new(rom: Vec<u8>) -> Self {
 
 		let intf = Rc::new(RefCell::new(Interrupt::default()));
 
 		Bus {
+
+			cart: create_cart(rom),
+
 			memory: [0xFF; 64 * 1024],
 
 			intf: Rc::clone(&intf),
@@ -96,7 +104,7 @@ impl Bus {
 
 			//0x104			..=	0x133 => logo[addr as usize - 0x104],
 
-			ROM_BANK1_START	..=	ROM_BANK2_END => self.rom[addr as usize],
+			ROM_BANK1_START	..=	ROM_BANK2_END => self.cart.read(addr),
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize],
 
 			/* PPU addresses */

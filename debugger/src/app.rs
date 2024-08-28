@@ -5,7 +5,7 @@ use eframe::{egui::{self, Frame, Key, Stroke, Style, TextBuffer}, App};
 use emu::Gameboy;
 use emu::joypad::*;
 
-use crate::components::{control::Control, cpu::Cpu, ppu::Ppu, display::Display};
+use crate::components::{control::{self, Control}, cpu::Cpu, display::Display, ppu::Ppu};
 
 const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
 
@@ -34,17 +34,15 @@ pub struct Debugger {
 impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
 
-		let mut emu = Gameboy::new();
-
 		let cart = fs::read("roms/dmg-acid2.gb").unwrap();
 
-		emu.init(&cart);
+		let mut emu = Gameboy::new(cart);
 
 		Self {
 			emu: emu,
 			last_update: Instant::now(),
 
-			display: Display::new(),
+			display: Display::new(cc),
 
 			control: Control::new(),
 			cpu: Cpu::new(),
@@ -72,29 +70,20 @@ impl App for Debugger {
 
 		});
 
-		if self.last_update.elapsed() >= Duration::from_secs_f64(1.0 / 60.0) && !self.control.paused {
-			let mut frames = self.last_update.elapsed().as_secs_f64();
-			
+		if !self.control.paused {
+
 			'update:
-			while frames >= 1.0 / 60.0 {
+			for i in 0..self.control.speed {
+				self.emu.run_frame();
 
-				let mut cycles: u64 = 0;
-
-				while cycles < CYCLES_PER_FRAME as u64 * self.control.speed as u64 {
-					cycles += self.emu.tick();
-
-					for i in self.control.breakpoints.iter() {
-						if self.emu.cpu.pc == *i {
-							self.control.paused = true;
-							break 'update;
-						}
+				for i in self.control.breakpoints.iter() {
+					if self.emu.cpu.pc == *i {
+						self.control.paused = true;
+						break 'update;
 					}
 				}
-				
-				frames -= CYCLES_PER_FRAME as f64;
 			}
-			
-			self.last_update = Instant::now();
+
 		}
 
 		egui::SidePanel::left("left_pannel").show(ctx, |ui| {
