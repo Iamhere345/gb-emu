@@ -7,7 +7,8 @@ use emu::joypad::*;
 
 use crate::components::{control::{self, Control}, cpu::Cpu, display::Display, ppu::Ppu};
 
-const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
+//const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
+const CYCLES_PER_FRAME: u64 = 69905;
 
 const BTN_A: Key 		= Key::Z;
 const BTN_B: Key 		= Key::X;
@@ -74,14 +75,28 @@ impl App for Debugger {
 
 			'update:
 			for i in 0..self.control.speed {
-				self.emu.run_frame();
 
-				for i in self.control.breakpoints.iter() {
-					if self.emu.cpu.pc == *i {
-						self.control.paused = true;
-						break 'update;
+				loop {
+
+					for i in self.control.breakpoints.iter() {
+						if self.emu.cpu.pc == *i {
+							self.control.paused = true;
+							break 'update;
+						}
 					}
+
+					let cycles = self.emu.tick();
+
+					self.emu.cycles += cycles;
+		
+					if self.emu.cycles >= CYCLES_PER_FRAME {
+						self.emu.cycles -= CYCLES_PER_FRAME;
+						break;
+					}
+		
 				}
+
+				
 			}
 
 		}

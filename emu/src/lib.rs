@@ -14,7 +14,7 @@ pub mod ppu;
 pub mod joypad;
 pub mod cart;
 
-const CYCLES_PER_SCANLINE: u64 = 69905;
+const CYCLES_PER_FRAME: u64 = 69905;
 
 pub struct Gameboy {
 	pub bus: Rc<RefCell<Bus>>,
@@ -65,8 +65,8 @@ impl Gameboy {
 
 			self.cycles += cycles;
 
-			if self.cycles >= CYCLES_PER_SCANLINE {
-				self.cycles -= CYCLES_PER_SCANLINE;
+			if self.cycles >= CYCLES_PER_FRAME {
+				self.cycles -= CYCLES_PER_FRAME;
 				break;
 			}
 

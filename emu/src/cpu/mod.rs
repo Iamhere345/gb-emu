@@ -133,7 +133,6 @@ impl CPU {
 					let new_if = self.bus.borrow().read_register(MemRegister::IF) & !(flag as u8);
 					self.bus.borrow_mut().write_register(MemRegister::IF, new_if);
 			
-			
 					self.ime = false;
 			
 					self.push16(self.pc);

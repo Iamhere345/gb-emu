@@ -108,7 +108,7 @@ lazy_static!{
 		], 4, "LD r8, r8", LD_R8_R8),
 		Instruction::new(vec![0x01, 0x11, 0x21, 0x31], 12, "LD r16, imm16", LD_R16_IMM),
 		Instruction::new(vec![0x06, 0x16, 0x26, 0x0E, 0x1E, 0x2E, 0x3E], 8, "LD r8, imm8", LD_R8_IMM),
-		Instruction::new(vec![0x36], 12, "LD r8, [HL]", LD_R8_IMM),
+		Instruction::new(vec![0x36], 12, "LD [HL], imm8", LD_R8_IMM),
 		Instruction::new(vec![0x02, 0x12, 0x22, 0x32], 8, "LD [r16mem], A", LD_R16MEM_A),
 		Instruction::new(vec![0x0A, 0x1A, 0x2A, 0x3A], 8, "LD A, [r16mem]", LD_A_R16MEM),
 		Instruction::new(vec![0xFA], 16, "LD A, [a16]", LD_A_A16),

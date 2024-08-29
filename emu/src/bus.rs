@@ -133,7 +133,7 @@ impl Bus {
 
 		match addr {
 
-			ROM_BANK1_START	..=	ROM_BANK2_END => {},
+			ROM_BANK1_START	..=	ROM_BANK2_END => self.cart.write(addr, write),
 
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize] = write,
 

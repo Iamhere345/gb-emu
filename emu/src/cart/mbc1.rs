@@ -1,28 +1,17 @@
-mod mbc0;
-mod mbc1;
+use super::{Cart, MBC};
 
-pub trait MBC {
-	fn read(&self, addr: u16) -> u8;
-	fn write(&mut self, addr: u16, write: u8);
-}
-
-struct CartInfo {
-	cart_type: u8,
-	
-}
-
-struct Cart {
+pub struct MBC1 {
 	rom: Vec<u8>,
 	ram: Option<Vec<u8>>,
 
-	rom_bank: u8,
+	rom_bank: u16,
 	ram_bank: u8,
 	
 	ram_enabled: bool
 }
 
-impl Cart {
-
+impl MBC1 {
+	
 	pub fn new(rom: Vec<u8>, has_ram: bool, ram_size: usize) -> Self {
 		
 		let ram = if has_ram { Some(vec![0; ram_size]) } else { None };
@@ -38,12 +27,15 @@ impl Cart {
 		}
 
 	}
-	
-	pub fn read(&self, addr: u16) -> u8 {
+
+}
+
+impl MBC for MBC1 {
+	fn read(&self, addr: u16) -> u8 {
 
 		match addr {
 			0		..= 0x3FFF	=> self.rom[addr as usize],
-			0x4000	..= 0x7FFF	=> self.rom[(addr as usize - 0x4000) + (0x4000 * self.rom_bank as usize)],
+			0x4000	..= 0x7FFF	=> self.rom[(addr as usize % 0x4000) + (0x4000 * self.rom_bank as usize)],
 			0xA000	..= 0xBFFF	=> {
 				if let Some(ref ram) = self.ram {
 					if self.ram_enabled {
@@ -58,12 +50,19 @@ impl Cart {
 
 	}
 
-	pub fn write(&mut self, addr: u16, write: u8) {
+	fn write(&mut self, addr: u16, write: u8) {
 
 		match addr {
-			0		..= 0x3FFF	=> self.rom[addr as usize] = write,
-			0x4000	..= 0x7FFF	=> self.rom[(addr as usize - 0x4000) + (0x4000 * self.rom_bank as usize)] = write,
+			0		..= 0x1FFF	=> self.ram_enabled = write == 0xA,
+			0x2000	..= 0x3FFF	=> {
+
+				self.rom_bank = (write & 0b0001_1111) as u16;
+
+				if self.rom_bank == 0 { self.rom_bank = 1; }
+
+			},
 			0xA000	..= 0xBFFF	=> {
+
 				if let Some(ref mut ram) = self.ram {
 					if self.ram_enabled {
 						return ram[addr as usize - 0xA000 + (self.ram_bank as usize * 0x2000)] = write;
@@ -74,15 +73,4 @@ impl Cart {
 		}
 
 	}
-
-}
-
-pub fn create_cart(rom: Vec<u8>) -> Box<dyn MBC> {
-
-	match rom[0x147] {
-		0x0 => Box::new(mbc0::MBC0::new(rom)),
-		0x1 => Box::new(mbc1::MBC1::new(rom, false, 0)),
-		_ => panic!("unimplenented cart type 0x{:X}", rom[0x147])
-	}
-
 }

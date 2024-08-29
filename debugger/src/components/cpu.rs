@@ -36,6 +36,13 @@ impl Cpu {
 
 		ui.horizontal(|ui| {
 
+			ui.monospace(format!("IME: {}", emu.cpu.ime));
+			ui.monospace(format!("HALT: {}", emu.cpu.halted));
+
+		});
+
+		ui.horizontal(|ui| {
+
 			ui.monospace(format!("Flags: {}{}{}{}", 
 				if emu.cpu.registers.get_flag(cpu::registers::Flag::Z) { "Z" } else { "_" },
 				if emu.cpu.registers.get_flag(cpu::registers::Flag::N) { "N" } else { "_" },

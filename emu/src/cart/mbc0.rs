@@ -19,7 +19,13 @@ impl MBC0 {
 impl MBC for MBC0 {
 
 	fn read(&self, addr: u16) -> u8 {
-		self.rom[addr as usize]
+
+		if addr <= 0x7FFF {
+			self.rom[addr as usize]
+		} else {
+			0xFF
+		}
+
 	}
 
 	fn write(&mut self, addr: u16, write: u8) {}
