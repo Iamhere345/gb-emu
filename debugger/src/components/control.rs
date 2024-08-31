@@ -10,8 +10,11 @@ pub struct Control {
 	pub scale: usize,
 
 	pub rom_path: String,
+	old_rom_path: String,
+
 	pub rom_list: Vec<&'static str>,
 	pub rom_index: usize,
+
 
 	pub breakpoints: Vec<u16>,
 	breakpoints_window_open: bool,
@@ -24,8 +27,9 @@ impl Control {
 		Self {
 			paused: true,
 			speed: 1,
-			scale: 2,
+			scale: 4,
 			rom_path: "roms/dmg-acid2.gb".to_string(),
+			old_rom_path: "roms/dmg-acid2.gb".to_string(),
 			rom_list:  vec![
 				"roms/dmg-acid2.gb", 
 				"roms/dmg_bootrom.gb", 
@@ -37,12 +41,37 @@ impl Control {
 				"roms/games/sml.gb", 
 				"roms/games/tennis.gb",
 				"roms/games/megaman.gb",
-				"roms/games/roadrash.gb",
+				"roms/games/zelda.gb",
 				],
 			rom_index: 0,
 			breakpoints: Vec::new(),
 			breakpoints_window_open: false,
 			breakpoint_str: String::new(),
+		}
+	}
+
+	pub fn save_sram(&self, emu: &Gameboy) {
+		if emu.bus.borrow().cart.is_battery_backed() {
+			let save_path = format!("{}.sav", self.old_rom_path);
+			let sram = emu.bus.borrow().cart.dump_sram();
+
+			fs::write(save_path, &sram).expect("Oh no! Your progress couldn't be saved.");
+
+		}
+	}
+
+	pub fn load_sram(&self, emu: &mut Gameboy) {
+		if emu.bus.borrow().cart.is_battery_backed() {
+
+			let save_path = format!("{}.sav", self.rom_path);
+			let sram_res = fs::read(save_path);
+
+			if let Ok(sram) = sram_res {
+				emu.bus.borrow_mut().cart.load_sram(sram);
+			} else {
+				println!("no save file present for {}", self.rom_path);
+			}
+
 		}
 	}
 
@@ -92,12 +121,18 @@ impl Control {
 
 				self.rom_path = self.rom_list[self.rom_index].to_string();
 
+				self.save_sram(emu);
 				self.reset_emu(emu);
+
+				self.old_rom_path = self.rom_path.clone();
 
 			}
 
 			if ui.text_edit_singleline(&mut self.rom_path).lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+				self.save_sram(emu);
 				self.reset_emu(emu);
+
+				self.old_rom_path = self.rom_path.clone();
 			}
 
 
@@ -160,6 +195,8 @@ impl Control {
 		if let Ok(rom) = rom_open {
 
 			*emu = Gameboy::new(rom);
+
+			self.load_sram(emu);
 
 		} else {
 			eprintln!("[ERROR] failed to open rom. Error: {:?}", rom_open.unwrap_err());

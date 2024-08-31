@@ -208,13 +208,19 @@ pub struct PPU {
 
 	sprite_cache: [Sprite; 40],
 
-	pub pixel_buf: [GBColour; 144 * 160],
+	pub display_buf: Rc<RefCell<[GBColour; 144 * 160]>>,
+	draw_buf: Rc<RefCell<[GBColour; 144 * 160]>>,
+
 	pub tile_data_buf: Vec<[GBColour; 8 * 8]>
 }
 
 impl PPU {
 
 	pub fn new(intf: Rc<RefCell<Interrupt>>) -> Self {
+
+		let buf_1 = Rc::new(RefCell::new([GBColour::LightGrey; 144 * 160]));
+        let buf_2 = Rc::new(RefCell::new([GBColour::LightGrey; 144 * 160]));
+
 		Self {
 			rendering_mode: RenderingMode::VBlank,
 
@@ -243,7 +249,9 @@ impl PPU {
 
 			sprite_cache: [Sprite::default(); 40],
 
-			pixel_buf: [GBColour::LightGrey; 144 * 160],
+			display_buf: Rc::clone(&buf_1),
+			draw_buf: Rc::clone(&buf_2),
+
 			tile_data_buf: vec![[GBColour::Black; 8 * 8]; 384],
 		}
 	}
@@ -279,26 +287,20 @@ impl PPU {
 		
 		// HBlank (Mode 0)
 		} else if self.line_dots > 80 + 172 {
-			self.rendering_mode = RenderingMode::HBlank;
+			if self.rendering_mode != RenderingMode::HBlank {
 
-			if self.reg_stat & StatFlag::Mode0Int as u8 != 0 && self.rendering_mode != RenderingMode::HBlank {
-				self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+				self.progress_scanline();
+
+				if self.reg_stat & StatFlag::Mode0Int as u8 != 0 && self.rendering_mode != RenderingMode::HBlank {
+					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+				}
 			}
+
+			self.rendering_mode = RenderingMode::HBlank;
 		}
 
 		// new line
 		if self.line_dots >= 456 {
-
-			// update window internal line counter whenever the window is active on a line
-			if self.reg_lcdc.window_enable && self.reg_ly > self.reg_wy && self.reg_wx < 159 + 7 && self.reg_wy < 144 {
-				self.win_ly = self.win_ly.wrapping_add(1);
-			}
-
-			// draw scanline
-			if self.reg_ly < 144 {
-				self.cache_all_sprites();
-				self.draw_scanline();
-			}
 
 			let dots_carry = if self.line_dots > 0 { self.line_dots - 456 } else { 0 };
 
@@ -306,21 +308,10 @@ impl PPU {
 			self.reg_ly += 1;
 			self.line_dots = dots_carry;
 
-			// LYC
-			if self.reg_ly == self.reg_lyc {
-
-				self.reg_stat |= StatFlag::LYCcmp as u8;
-
-				if self.reg_stat & StatFlag::LYCInt as u8 != 0 {
-					self.intf.borrow_mut().raise(InterruptFlag::LCDC);
-				}
-
-			} else {
-				self.reg_stat &= !(StatFlag::LYCcmp as u8);
-			}
-
 			// VBlank
 			if self.reg_ly == 144 {
+
+				self.display_buf.swap(&self.draw_buf);
 
 				self.rendering_mode = RenderingMode::VBlank;
 				self.intf.borrow_mut().raise(InterruptFlag::VBlank);
@@ -345,13 +336,38 @@ impl PPU {
 
 	}
 
+	fn progress_scanline(&mut self) {
+		// update window internal line counter whenever the window is active on a line
+		if self.reg_lcdc.window_enable && self.reg_ly > self.reg_wy && self.reg_wx < 159 + 7 && self.reg_wy < 144 {
+			self.win_ly = self.win_ly.wrapping_add(1);
+		}
+
+		// draw scanline
+		if self.reg_ly < 144 {
+			self.cache_all_sprites();
+			self.draw_scanline();
+		}
+
+		// LYC
+		if self.reg_ly == self.reg_lyc || (self.reg_ly == 153 && self.reg_ly == 0) {
+			
+			if self.reg_stat & StatFlag::LYCInt as u8 != 0 {
+				self.reg_stat |= StatFlag::LYCcmp as u8;
+				self.intf.borrow_mut().raise(InterruptFlag::LCDC);
+			}
+
+		} else {
+			self.reg_stat &= !(StatFlag::LYCcmp as u8);
+		}
+	}
+
 	fn draw_scanline(&mut self) {
 
 		if self.reg_lcdc.bg_enable {
 			self.draw_tiles()
 		} else {
 			for x in 0..160 {
-				self.pixel_buf[x + 160 * self.reg_ly as usize] = GBColour::White;
+				self.draw_buf.borrow_mut()[x + 160 * self.reg_ly as usize] = GBColour::White;
 			}
 		}
 
@@ -368,9 +384,9 @@ impl PPU {
 			true => (0x8000, false),
 		};
 
-		for x in 0..160 {
+		for x in 0..160_u8 {
 
-			let in_window = self.reg_lcdc.window_enable && self.reg_ly >= self.reg_wy && x >= self.reg_wx.wrapping_sub(7);
+			let in_window = self.reg_lcdc.window_enable && self.reg_ly >= self.reg_wy && x as isize >= self.reg_wx as isize - 8;
 
 			let y_pos = match in_window {
 				true => self.win_ly,
@@ -418,7 +434,7 @@ impl PPU {
 
 			let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
 
-			self.pixel_buf[x as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
+			self.draw_buf.borrow_mut()[x as usize + 160 * self.reg_ly as usize] = self.reg_bgp.get_pal_value(pal_id);
 
 		}
 
@@ -462,7 +478,7 @@ impl PPU {
 
 				let pixel_buf_index = x_offset as usize + 160 * self.reg_ly as usize;
 
-				if sprite.priority == true && self.pixel_buf[pixel_buf_index] != self.reg_bgp.get_pal_value(0) {
+				if sprite.priority == true && self.draw_buf.borrow()[pixel_buf_index] != self.reg_bgp.get_pal_value(0) {
 					continue;
 				}
 
@@ -479,7 +495,7 @@ impl PPU {
 				let pal_id = (data_1 >> pixel_index & 1) | (data_2 >> pixel_index & 1) << 1;
 
 				if pal_id != 0 {
-					self.pixel_buf[pixel_buf_index] = pal.get_pal_value(pal_id);
+					self.draw_buf.borrow_mut()[pixel_buf_index] = pal.get_pal_value(pal_id);
 				}
 
 			}
@@ -553,6 +569,10 @@ impl PPU {
 
 		}
 
+	}
+
+	pub fn get_frame(&self) -> [GBColour; 160 * 144] {
+		*self.display_buf.borrow_mut()
 	}
 
 	pub fn read(&self, addr: u16) -> u8 {

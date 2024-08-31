@@ -6,7 +6,7 @@ const SCREEN_WIDTH: usize = 160;
 const SCREEN_HEIGHT: usize = 144;
 
 pub struct Display {
-	screen_tex: TextureHandle
+	screen_tex: TextureHandle,
 }
 
 impl Display {
@@ -20,7 +20,7 @@ impl Display {
 		);
 
 		Display {
-			screen_tex: screen_tex
+			screen_tex: screen_tex,
 		}
 	}
 
@@ -28,30 +28,13 @@ impl Display {
 
 		let mut display_buf = vec![Color32::default(); SCREEN_WIDTH * SCREEN_HEIGHT];
 
-		for (i, pixel) in emu.bus.borrow().ppu.pixel_buf.iter().enumerate() {
-
-			/*
-			for scaled_y in 0..scale {
-				for scaled_x in 0..scale {
-
-					let x = (i % SCREEN_WIDTH * scale) + scaled_x;
-					let y = (i / SCREEN_WIDTH * scale) + scaled_y;
-
-					match pixel {
-						ppu::GBColour::White => display_buf[x + (SCREEN_WIDTH * scale) * y] = Color32::from_rgb(255, 255, 255),
-						ppu::GBColour::LightGrey => display_buf[x + (SCREEN_WIDTH * scale) * y] = Color32::from_rgb(128, 128, 128),
-						ppu::GBColour::DarkGrey => display_buf[x + (SCREEN_WIDTH * scale) * y] = Color32::from_rgb(64, 64, 64),
-						ppu::GBColour::Black => display_buf[x + (SCREEN_WIDTH * scale) * y] = Color32::from_rgb(0, 0, 0)
-					}
-				}
-			}
-			*/
+		for (i, pixel) in emu.bus.borrow().ppu.get_frame().iter().enumerate() {
 
 			match pixel {
-				ppu::GBColour::White => display_buf[i] = Color32::from_rgb(255, 255, 255),
-				ppu::GBColour::LightGrey => display_buf[i] = Color32::from_rgb(128, 128, 128),
-				ppu::GBColour::DarkGrey => display_buf[i] = Color32::from_rgb(64, 64, 64),
-				ppu::GBColour::Black => display_buf[i] = Color32::from_rgb(0, 0, 0)
+				ppu::GBColour::White => display_buf[i] = Color32::from_rgb(0xFF, 0xFF, 0xFF),
+				ppu::GBColour::LightGrey => display_buf[i] = Color32::from_rgb(0xAA, 0xAA, 0xAA),
+				ppu::GBColour::DarkGrey => display_buf[i] = Color32::from_rgb(0x55, 0x55, 0x55),
+				ppu::GBColour::Black => display_buf[i] = Color32::from_rgb(0x0, 0x0, 0x0)
 			}
 
 		}

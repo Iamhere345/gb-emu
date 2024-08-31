@@ -1,11 +1,9 @@
-use std::{fs, time::{Duration, Instant}};
-
-use eframe::{egui::{self, Frame, Key, Stroke, Style, TextBuffer}, App};
+use eframe::{egui::{self, Key}, App};
 
 use emu::Gameboy;
 use emu::joypad::*;
 
-use crate::components::{control::{self, Control}, cpu::Cpu, display::Display, ppu::Ppu};
+use crate::components::{control::Control, cpu::Cpu, display::Display, ppu::Ppu};
 
 //const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
 const CYCLES_PER_FRAME: u64 = 69905;
@@ -23,7 +21,6 @@ const DPAD_RIGHT: Key 	= Key::ArrowRight;
 
 pub struct Debugger {
 	emu: Gameboy,
-	last_update: Instant,
 
 	display: Display,
 
@@ -35,13 +32,12 @@ pub struct Debugger {
 impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
 
-		let cart = fs::read("roms/dmg-acid2.gb").unwrap();
+		let cart = std::fs::read("roms/dmg-acid2.gb").unwrap();
 
-		let mut emu = Gameboy::new(cart);
+		let emu = Gameboy::new(cart);
 
 		Self {
 			emu: emu,
-			last_update: Instant::now(),
 
 			display: Display::new(cc),
 
@@ -53,7 +49,7 @@ impl Debugger {
 }
 
 impl App for Debugger {
-	fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 		
 		ctx.input(|input| {
 
@@ -64,17 +60,29 @@ impl App for Debugger {
 			if input.key_down(BTN_SELECT) { joypad.btn_down(GBInput::BtnSelect) } else { joypad.btn_up(GBInput::BtnSelect) }
 			if input.key_down(BTN_START) { joypad.btn_down(GBInput::BtnStart) } else { joypad.btn_up(GBInput::BtnStart) }
 
-			if input.key_down(DPAD_UP) { joypad.btn_down(GBInput::DPadUp) } else { joypad.btn_up(GBInput::DPadUp) }
-			if input.key_down(DPAD_DOWN) { joypad.btn_down(GBInput::DPadDown) } else { joypad.btn_up(GBInput::DPadDown) }
-			if input.key_down(DPAD_LEFT) { joypad.btn_down(GBInput::DPadLeft) } else { joypad.btn_up(GBInput::DPadLeft) }
-			if input.key_down(DPAD_RIGHT) { joypad.btn_down(GBInput::DPadRight) } else { joypad.btn_up(GBInput::DPadRight) }
+			if !(input.key_down(DPAD_LEFT) && input.key_down(DPAD_RIGHT)) {
+				if input.key_down(DPAD_LEFT) { joypad.btn_down(GBInput::DPadLeft) } else { joypad.btn_up(GBInput::DPadLeft) }
+				if input.key_down(DPAD_RIGHT) { joypad.btn_down(GBInput::DPadRight) } else { joypad.btn_up(GBInput::DPadRight) }
+			} else {
+				joypad.btn_up(GBInput::DPadLeft);
+				joypad.btn_up(GBInput::DPadRight);
+			}
+
+			if !(input.key_down(DPAD_UP) && input.key_down(DPAD_DOWN)) {
+				if input.key_down(DPAD_UP) { joypad.btn_down(GBInput::DPadUp) } else { joypad.btn_up(GBInput::DPadUp) }
+				if input.key_down(DPAD_DOWN) { joypad.btn_down(GBInput::DPadDown) } else { joypad.btn_up(GBInput::DPadDown) }
+			} else {
+				joypad.btn_up(GBInput::DPadUp);
+				joypad.btn_up(GBInput::DPadDown);
+			}
+			
 
 		});
 
 		if !self.control.paused {
 
 			'update:
-			for i in 0..self.control.speed {
+			for _ in 0..self.control.speed {
 
 				loop {
 
@@ -135,5 +143,11 @@ impl App for Debugger {
 		
 		ctx.request_repaint();
 		
+	}
+}
+
+impl Drop for Debugger {
+	fn drop(&mut self) {
+		self.control.save_sram(&self.emu);
 	}
 }

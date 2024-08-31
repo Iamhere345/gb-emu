@@ -11,9 +11,10 @@ use super::cart::MBC;
 
 // possible off-by-one error
 const ROM_BANK1_START: 		u16	= 0x0;
-const ROM_BANK1_END: 		u16	= 0x3FFF;
-
 const ROM_BANK2_END: 		u16 = 0x7FFF;
+
+const EXT_RAM_START:		u16 = 0xA000;
+const EXT_RAM_END:			u16 = 0xBFFF;
 
 const WRAM_START:			u16	= 0xC000;
 const WRAM_END:				u16	= 0xDFFF;
@@ -105,6 +106,9 @@ impl Bus {
 			//0x104			..=	0x133 => logo[addr as usize - 0x104],
 
 			ROM_BANK1_START	..=	ROM_BANK2_END => self.cart.read(addr),
+
+			EXT_RAM_START	..= EXT_RAM_END => self.cart.read(addr),
+
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize],
 
 			/* PPU addresses */
@@ -134,6 +138,8 @@ impl Bus {
 		match addr {
 
 			ROM_BANK1_START	..=	ROM_BANK2_END => self.cart.write(addr, write),
+
+			EXT_RAM_START	..= EXT_RAM_END => self.cart.write(addr, write),
 
 			WRAM_START		..=	WRAM_END => self.wram[(addr - WRAM_START) as usize] = write,
 

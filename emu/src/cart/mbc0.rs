@@ -1,4 +1,4 @@
-use super::{Cart, MBC};
+use super::MBC;
 
 pub struct MBC0 {
 	rom: Vec<u8>
@@ -29,5 +29,15 @@ impl MBC for MBC0 {
 	}
 
 	fn write(&mut self, addr: u16, write: u8) {}
+
+	fn is_battery_backed(&self) -> bool {
+		false
+	}
+
+	fn dump_sram(&self) -> Vec<u8> {
+		Vec::new()
+	}
+
+	fn load_sram(&mut self, sram: Vec<u8>) {}
 
 }
