@@ -256,7 +256,40 @@ impl PPU {
 		}
 	}
 
-	// called directly after the cpu has been ticked, and updates accordingly
+	fn change_mode(&mut self, mode: RenderingMode) {
+
+		self.rendering_mode = mode;
+		self.reg_stat = (self.reg_stat & !0x3) | self.rendering_mode as u8;
+
+		match mode {
+			RenderingMode::HBlank => {
+
+				self.draw_scanline();
+
+				// compare lyc at the start of hblank, increment ly at the end of hblank
+				self.compare_lyc();
+
+				if self.reg_stat & StatFlag::Mode0Int as u8 != 0 && self.rendering_mode != RenderingMode::HBlank {
+					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+				}
+			},
+			RenderingMode::VBlank => {
+				self.intf.borrow_mut().raise(InterruptFlag::VBlank);
+
+				if self.reg_stat & StatFlag::Mode1Int as u8 != 0 {
+					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+				}
+			},
+			RenderingMode::OAMscan => {
+				if self.reg_stat & StatFlag::Mode2Int as u8 != 0 && self.rendering_mode != RenderingMode::OAMscan {
+					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+				}
+			},
+			_ => {}
+		}
+
+	}
+
 	pub fn tick(&mut self, cycles: u64) {
 
 		if !self.reg_lcdc.lcd_enable {
@@ -271,85 +304,52 @@ impl PPU {
 
 		self.line_dots += cycles as i32; // 1 T-state == 1 dot
 
-		/* Rendering mode logic */
+		match self.rendering_mode {
+			RenderingMode::OAMscan if self.line_dots >= 80 => {
+				self.line_dots -= 80;
 
-		// OAM scan (mode 2)
-		if self.line_dots <= 80 {
-			if self.reg_stat & StatFlag::Mode2Int as u8 != 0 && self.rendering_mode != RenderingMode::OAMscan {
-				self.intf.borrow_mut().raise(InterruptFlag::LCDC)
-			}
-			
-			self.rendering_mode = RenderingMode::OAMscan;
+				self.change_mode(RenderingMode::Draw)
+			},
+			RenderingMode::Draw if self.line_dots >= 172 => {
+				self.line_dots -= 172;
 
-		// Draw (mode 3)
-		} else if self.line_dots <= 80 + 172 {
-			self.rendering_mode = RenderingMode::Draw;
-		
-		// HBlank (Mode 0)
-		} else if self.line_dots > 80 + 172 {
-			if self.rendering_mode != RenderingMode::HBlank {
+				self.change_mode(RenderingMode::HBlank);
+			},
+			RenderingMode::HBlank if self.line_dots >= 204 => {
+				self.line_dots -= 204;
+				self.reg_ly += 1;
 
-				self.progress_scanline();
-
-				if self.reg_stat & StatFlag::Mode0Int as u8 != 0 && self.rendering_mode != RenderingMode::HBlank {
-					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
+				if self.reg_ly == 144 {
+					self.change_mode(RenderingMode::VBlank);
+				} else {
+					self.change_mode(RenderingMode::OAMscan);
 				}
-			}
+			},
+			RenderingMode::VBlank if self.line_dots >= 456 => {
+				self.line_dots -= 456;
+				self.reg_ly += 1;
 
-			self.rendering_mode = RenderingMode::HBlank;
-		}
+				if self.reg_ly == 154 {
 
-		// new line
-		if self.line_dots >= 456 {
+					self.draw_buf.swap(&self.display_buf);
 
-			let dots_carry = if self.line_dots > 0 { self.line_dots - 456 } else { 0 };
+					self.reg_ly = 0;
+					self.win_ly = 0;
+					
+					self.change_mode(RenderingMode::OAMscan);
 
-			// go to the next line and reset the line counter
-			self.reg_ly += 1;
-			self.line_dots = dots_carry;
-
-			// VBlank
-			if self.reg_ly == 144 {
-
-				self.display_buf.swap(&self.draw_buf);
-
-				self.rendering_mode = RenderingMode::VBlank;
-				self.intf.borrow_mut().raise(InterruptFlag::VBlank);
-
-				//println!("vblank");
-
-				if self.reg_stat & StatFlag::Mode1Int as u8 != 0 {
-					self.intf.borrow_mut().raise(InterruptFlag::LCDC)
 				}
-			}
 
-			// end of VBlank
-			if self.reg_ly == 154 {
-				self.reg_ly = 0;
-				self.win_ly = 0;
-			}
-
+				// idk if this should be before or after the ly increment
+				self.compare_lyc();
+			},
+			_ => {}
 		}
-
-		// update stat register for potentially new rendering mode
-		self.reg_stat = (self.reg_stat & !0x3) | self.rendering_mode as u8;
 
 	}
 
-	fn progress_scanline(&mut self) {
-		// update window internal line counter whenever the window is active on a line
-		if self.reg_lcdc.window_enable && self.reg_ly > self.reg_wy && self.reg_wx < 159 + 7 && self.reg_wy < 144 {
-			self.win_ly = self.win_ly.wrapping_add(1);
-		}
-
-		// draw scanline
-		if self.reg_ly < 144 {
-			self.cache_all_sprites();
-			self.draw_scanline();
-		}
-
-		// LYC
-		if self.reg_ly == self.reg_lyc || (self.reg_ly == 153 && self.reg_ly == 0) {
+	fn compare_lyc(&mut self) {
+		if self.reg_ly + 1 == self.reg_lyc || (self.reg_ly == 153 && self.reg_lyc == 0) {
 			
 			if self.reg_stat & StatFlag::LYCInt as u8 != 0 {
 				self.reg_stat |= StatFlag::LYCcmp as u8;
@@ -362,6 +362,12 @@ impl PPU {
 	}
 
 	fn draw_scanline(&mut self) {
+
+		if self.reg_lcdc.window_enable && self.reg_ly > self.reg_wy && self.reg_wx < 159 + 7 && self.reg_wy < 144 {
+			self.win_ly = self.win_ly.wrapping_add(1);
+		}
+
+		self.cache_all_sprites();
 
 		if self.reg_lcdc.bg_enable {
 			self.draw_tiles()
@@ -386,7 +392,7 @@ impl PPU {
 
 		for x in 0..160_u8 {
 
-			let in_window = self.reg_lcdc.window_enable && self.reg_ly >= self.reg_wy && x as isize >= self.reg_wx as isize - 8;
+			let in_window = self.reg_lcdc.window_enable && self.reg_ly >= self.reg_wy && x as isize >= self.reg_wx as isize - 7;
 
 			let y_pos = match in_window {
 				true => self.win_ly,
