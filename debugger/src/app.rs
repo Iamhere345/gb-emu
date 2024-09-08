@@ -3,7 +3,7 @@ use eframe::{egui::{self, Key}, App};
 use emu::Gameboy;
 use emu::joypad::*;
 
-use crate::components::{control::Control, cpu::Cpu, display::Display, ppu::Ppu};
+use crate::components::{control::Control, cpu::Cpu, display::Display, ppu::Ppu, mbc::Mbc};
 
 //const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
 const CYCLES_PER_FRAME: u64 = 69905;
@@ -27,6 +27,7 @@ pub struct Debugger {
 	control: Control,
 	cpu: Cpu,
 	ppu: Ppu,
+	mbc: Mbc,
 }
 
 impl Debugger {
@@ -44,6 +45,7 @@ impl Debugger {
 			control: Control::new(),
 			cpu: Cpu::new(),
 			ppu: Ppu::new(),
+			mbc: Mbc::new()
 		}
 	}
 }
@@ -123,7 +125,11 @@ impl App for Debugger {
 			
 			ui.separator();
 			
-			self.ppu.show(ctx, ui, &mut self.emu)
+			self.ppu.show(ctx, ui, &mut self.emu);
+
+			ui.separator();
+
+			self.mbc.show(ctx, ui, &mut self.emu);
 
 		});
 		

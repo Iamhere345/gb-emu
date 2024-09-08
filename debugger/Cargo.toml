@@ -9,3 +9,4 @@ default-run = "debugger"
 [dependencies]
 emu = { path = "../emu"}
 eframe = "0.26.2"
+native-dialog = "0.7.0"

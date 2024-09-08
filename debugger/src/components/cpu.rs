@@ -10,7 +10,7 @@ impl Cpu {
 		Cpu {}
 	}
 
-	pub fn show(&mut self, ctx: &Context, ui: &mut Ui, emu: &mut Gameboy) {
+	pub fn show(&mut self, _ctx: &Context, ui: &mut Ui, emu: &mut Gameboy) {
 
 		ui.strong("CPU");
 

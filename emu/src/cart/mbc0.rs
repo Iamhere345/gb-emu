@@ -1,3 +1,4 @@
+#![allow(unused_variables)]
 use super::MBC;
 
 pub struct MBC0 {

@@ -11,6 +11,7 @@ pub enum RenderingMode {
 	Draw 	= 3,	// Mode 3   
 }
 
+#[allow(dead_code)]
 enum StatFlag {
 	PPUMode		= 0x03,
 	LYCcmp		= 0x04,

@@ -1,9 +1,7 @@
 use cpu::*;
 use bus::Bus;
-use cpu::registers::{Register8Bit, Register16Bit};
 
 use std::cell::RefCell;
-use std::io::{self, Write};
 use std::rc::Rc;
 
 pub mod cpu;
@@ -44,14 +42,14 @@ impl Gameboy {
 		self.bus.borrow_mut().timer.tick(instr_cycles);
 		self.bus.borrow_mut().ppu.tick(instr_cycles);
 
-		if self.bus.borrow().read_byte(0xFF02) == 0x81 {
+		/* if self.bus.borrow().read_byte(0xFF02) == 0x81 {
 
 			let serial_char: char = self.bus.borrow().read_byte(0xFF01) as char;
 
 			//print!("{}", serial_char);
 
 			self.bus.borrow_mut().write_byte(0xFF02, 0);
-		}
+		} */
 
 		instr_cycles
 

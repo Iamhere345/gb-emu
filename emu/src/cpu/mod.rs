@@ -84,7 +84,7 @@ impl CPU {
 			for opcode in instruction.opcodes.iter() {
 				if byte == *opcode {
 
-					let last_pc = self.pc;
+					//let last_pc = self.pc;
 
 					self.last_instruction = instruction.mnemonic.to_string();
 
@@ -103,7 +103,7 @@ impl CPU {
 		}
 
 		if !executed {
-			println!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
+			//println!("[0x{:x}] Undefined opcode: 0x{:x}", self.pc, byte);
 		}
 
 		instr_cycles

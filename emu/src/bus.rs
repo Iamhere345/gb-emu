@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fs;
 use std::rc::Rc;
 
 use crate::cart::create_cart;
@@ -44,17 +45,20 @@ pub struct Bus {
 	memory: [u8; 64 * 1024],
 
 	pub cart: Box<dyn MBC>,
-
+	
 	pub intf: Rc<RefCell<Interrupt>>,
 	pub timer: Timer,
 	pub ppu: PPU,
 	pub joypad: Joypad,
 	
 	dma_src: u8,
-
+	
 	pub rom: [u8; 0x8000],
 	wram: [u8; 0x8000],
 	hram: [u8; 0x7F],
+
+	bootrom: Vec<u8>,
+	pub bootrom_loaded: bool,
 
 	/*
 	rom_bank1: 		[u8; ROM_BANK1_END],							// fixed ROM bank from the cart
@@ -93,6 +97,9 @@ impl Bus {
 			rom: [0xFF; 0x8000],
 			wram: [0xFF; 0x8000],
 			hram: [0xFF; 0x7F],
+
+			bootrom: fs::read("roms/dmg_bootrom.gb").unwrap(),
+			bootrom_loaded: false,
 		}
 
 	}
@@ -104,6 +111,8 @@ impl Bus {
 		return match addr {
 
 			//0x104			..=	0x133 => logo[addr as usize - 0x104],
+
+			0x0				..= 0xFF if self.bootrom_loaded => self.bootrom[addr as usize],
 
 			ROM_BANK1_START	..=	ROM_BANK2_END => self.cart.read(addr),
 
@@ -152,6 +161,8 @@ impl Bus {
 			0xFF46 => self.dma_transfer(write),
 
 			0xFF40			..= 0xFF4B => self.ppu.write(addr, write),
+
+			0xFF50 if self.bootrom_loaded => self.bootrom_loaded = false,
 
 			0xFF04			..= 0xFF07 => self.timer.write(addr, write),
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().write(addr, write),

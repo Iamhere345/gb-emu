@@ -24,7 +24,7 @@ impl Display {
 		}
 	}
 
-	pub fn show(&mut self, ctx: &Context, ui: &mut Ui, emu: &mut Gameboy, scale: usize) {
+	pub fn show(&mut self, _ctx: &Context, ui: &mut Ui, emu: &mut Gameboy, scale: usize) {
 
 		let mut display_buf = vec![Color32::default(); SCREEN_WIDTH * SCREEN_HEIGHT];
 

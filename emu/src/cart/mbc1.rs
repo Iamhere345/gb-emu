@@ -17,8 +17,15 @@ pub struct MBC1 {
 
 impl MBC1 {
 	
-	pub fn new(rom: Vec<u8>, has_ram: bool, has_battery: bool, ram_size: usize) -> Self {
+	pub fn new(rom: Vec<u8>, ram_size: usize) -> Self {
 		
+		let has_ram = match rom[0x147] {
+			0x2 | 0x3 => true,
+			_ => false,
+		};
+
+		let has_battery = rom[0x147] == 0x3;
+
 		let ram = if has_ram { Some(vec![0; ram_size]) } else { None };
 		let rom_size = rom[0x148];
 
@@ -64,12 +71,12 @@ impl MBC for MBC1 {
 			// ram bank x
 			0xA000	..= 0xBFFF	=> {
 				if let Some(ref ram) = self.ram {
-					if self.ram_enabled {
+					if self.ram_enabled && self.ram_banks != 0 {
 						let bank = if self.banking_mode {
 							self.upper_bank as usize
 						} else {
 							0
-						} %self.ram_banks;
+						} % self.ram_banks;
 
 						return ram[addr as usize - 0xA000 + (bank * 0x2000)];
 					}
@@ -107,12 +114,12 @@ impl MBC for MBC1 {
 			0xA000	..= 0xBFFF	=> {
 
 				if let Some(ref mut ram) = self.ram {
-					if self.ram_enabled {
+					if self.ram_enabled && self.ram_banks != 0 {
 						let bank = if self.banking_mode {
 							self.upper_bank as usize
 						} else {
 							0
-						} %self.ram_banks;
+						} % self.ram_banks;
 
 						return ram[addr as usize - 0xA000 + (bank * 0x2000)] = write;
 					}
