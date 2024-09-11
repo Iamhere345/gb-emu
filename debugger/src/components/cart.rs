@@ -2,14 +2,14 @@ use eframe::egui::*;
 
 use emu::Gameboy;
 
-pub struct Mbc {
+pub struct Cart {
 	pub enable_bootrom: bool,
 }
 
-impl Mbc {
+impl Cart {
 
 	pub fn new() -> Self {
-		Mbc {
+		Cart {
 			enable_bootrom: false,
 		}
 	}
@@ -17,7 +17,6 @@ impl Mbc {
 	pub fn show(&mut self, _ctx: &Context, ui: &mut Ui, emu: &mut Gameboy) {
 
 		ui.strong("Cartridge");
-
 
 		let cart_id = emu.bus.borrow().read_byte(0x147);
 

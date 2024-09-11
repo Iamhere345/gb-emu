@@ -1,9 +1,11 @@
 use eframe::{egui::{self, Key}, App};
+use rodio::buffer::SamplesBuffer;
+use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use emu::Gameboy;
 use emu::joypad::*;
 
-use crate::components::{control::Control, cpu::Cpu, display::Display, ppu::Ppu, mbc::Mbc};
+use crate::components::{control::Control, cpu::Cpu, display::Display, ppu::Ppu, cart::Cart};
 
 //const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
 const CYCLES_PER_FRAME: u64 = 69905;
@@ -22,12 +24,15 @@ const DPAD_RIGHT: Key 	= Key::ArrowRight;
 pub struct Debugger {
 	emu: Gameboy,
 
+	audio_stream: OutputStream,
+	stream_handle: OutputStreamHandle,
+
 	display: Display,
 
 	control: Control,
 	cpu: Cpu,
 	ppu: Ppu,
-	mbc: Mbc,
+	cart: Cart,
 }
 
 impl Debugger {
@@ -35,17 +40,29 @@ impl Debugger {
 
 		let cart = std::fs::read("roms/dmg-acid2.gb").unwrap();
 
-		let emu = Gameboy::new(cart);
+		let (stream, stream_handle) = OutputStream::try_default().unwrap();
+        let sink = Sink::try_new(&stream_handle).unwrap();
+
+		let emu = Gameboy::new(cart, Box::new(move |buffer| {
+			while sink.len() > 2 {
+				std::thread::sleep(std::time::Duration::from_millis(1))
+			}
+
+			sink.append(SamplesBuffer::new(2, 48000, buffer));
+		}));
 
 		Self {
 			emu: emu,
+
+			audio_stream: stream,
+			stream_handle: stream_handle,
 
 			display: Display::new(cc),
 
 			control: Control::new(),
 			cpu: Cpu::new(),
 			ppu: Ppu::new(),
-			mbc: Mbc::new()
+			cart: Cart::new()
 		}
 	}
 }
@@ -117,7 +134,7 @@ impl App for Debugger {
 			
 			ui.separator();
 			
-			self.control.show(ctx, ui, &mut self.emu);
+			self.control.show(ctx, ui, &mut self.emu, &mut self.stream_handle);
 			
 			ui.separator();
 			
@@ -129,7 +146,7 @@ impl App for Debugger {
 
 			ui.separator();
 
-			self.mbc.show(ctx, ui, &mut self.emu);
+			self.cart.show(ctx, ui, &mut self.emu);
 
 		});
 		

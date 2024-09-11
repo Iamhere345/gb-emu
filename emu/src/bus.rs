@@ -2,11 +2,13 @@ use std::cell::RefCell;
 use std::fs;
 use std::rc::Rc;
 
+use crate::apu;
 use crate::cart::create_cart;
 
 use super::timer::Timer;
 use super::interrupt::Interrupt;
 use super::ppu::PPU;
+use super::apu::APU;
 use super::joypad::Joypad;
 use super::cart::MBC;
 
@@ -49,6 +51,7 @@ pub struct Bus {
 	pub intf: Rc<RefCell<Interrupt>>,
 	pub timer: Timer,
 	pub ppu: PPU,
+	pub apu: APU,
 	pub joypad: Joypad,
 	
 	dma_src: u8,
@@ -77,7 +80,7 @@ pub struct Bus {
 
 impl Bus {
 
-	pub fn new(rom: Vec<u8>) -> Self {
+	pub fn new(rom: Vec<u8>, audio_callback: Box<dyn Fn(&[f32])>) -> Self {
 
 		let intf = Rc::new(RefCell::new(Interrupt::default()));
 
@@ -90,6 +93,7 @@ impl Bus {
 			intf: Rc::clone(&intf),
 			timer: Timer::new(Rc::clone(&intf)),
 			ppu: PPU::new(Rc::clone(&intf)),
+			apu: APU::new(audio_callback),
 			joypad: Joypad::new(Rc::clone(&intf)),
 
 			dma_src: 0,
@@ -133,6 +137,8 @@ impl Bus {
 			0xFF04			..= 0xFF07 => self.timer.read(addr),
 			0xFF0F			|	0xFFFF => self.intf.borrow().read(addr),
 
+			0xFF10..=0xFF26 | 0xFF30..=0xFF3F => self.apu.read_byte(addr),
+
 			HRAM_START		..= HRAM_END => self.hram[(addr - HRAM_START) as usize],
 			_ => self.memory[addr as usize]
 		};
@@ -166,6 +172,8 @@ impl Bus {
 
 			0xFF04			..= 0xFF07 => self.timer.write(addr, write),
 			0xFF0F			|	0xFFFF => self.intf.borrow_mut().write(addr, write),
+
+			0xFF10..=0xFF26 | 0xFF30..=0xFF3F => self.apu.write_byte(addr, write),
 
 			HRAM_START		..=	HRAM_END => self.hram[(addr - HRAM_START) as usize] = write,
 

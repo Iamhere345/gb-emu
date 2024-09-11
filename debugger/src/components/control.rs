@@ -3,6 +3,7 @@ use eframe::egui::*;
 use native_dialog::{FileDialog, Filter};
 
 use emu::Gameboy;
+use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink};
 
 pub struct Control {
 	pub paused: bool,
@@ -60,7 +61,7 @@ impl Control {
 		}
 	}
 
-	pub fn show(&mut self, ctx: &Context, ui: &mut Ui, emu: &mut Gameboy) {
+	pub fn show(&mut self, ctx: &Context, ui: &mut Ui, emu: &mut Gameboy, stream_handle: &mut OutputStreamHandle) {
 
 		ui.strong("Control");
 		
@@ -107,7 +108,7 @@ impl Control {
 				self.rom_path = self.rom_list[self.rom_index].to_string();
 
 				self.save_sram(emu);
-				self.reset_emu(emu, self.enable_bootrom);
+				self.reset_emu(emu, stream_handle, self.enable_bootrom);
 
 				self.old_rom_path = self.rom_path.clone();
 
@@ -125,7 +126,7 @@ impl Control {
 					self.rom_path = rom.to_str().unwrap().to_string();
 
 					self.save_sram(emu);
-					self.reset_emu(emu, self.enable_bootrom);
+					self.reset_emu(emu, stream_handle, self.enable_bootrom);
 
 					self.old_rom_path = self.rom_path.clone();
 				}
@@ -211,13 +212,21 @@ impl Control {
 		}
 	}
 
-	fn reset_emu(&mut self, emu: &mut Gameboy, enable_bootrom: bool) {
+	fn reset_emu(&mut self, emu: &mut Gameboy, stream_handle: &mut OutputStreamHandle, enable_bootrom: bool) {
 
 		let rom_open = fs::read(self.rom_path.clone());
 
 		if let Ok(rom) = rom_open {
 
-			*emu = Gameboy::new(rom);
+			let sink = Sink::try_new(&stream_handle).unwrap();
+
+			*emu = Gameboy::new(rom, Box::new(move |buffer| {
+				while sink.len() > 2 {
+					std::thread::sleep(std::time::Duration::from_millis(1))
+				}
+
+				sink.append(SamplesBuffer::new(2, 48000, buffer));
+			}));
 
 			if enable_bootrom {
 				emu.bus.borrow_mut().bootrom_loaded = true;

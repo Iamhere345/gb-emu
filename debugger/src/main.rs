@@ -13,7 +13,7 @@ fn main() {
 
 	let native_options = NativeOptions {
 		viewport: viewport,
-		vsync: true,
+		vsync: false,
 		..Default::default()
 	};
 

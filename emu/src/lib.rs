@@ -11,6 +11,7 @@ pub mod timer;
 pub mod ppu;
 pub mod joypad;
 pub mod cart;
+pub mod apu;
 
 const CYCLES_PER_FRAME: u64 = 69905;
 
@@ -22,10 +23,9 @@ pub struct Gameboy {
 
 impl Gameboy {
 
-	
-	pub fn new(cart: Vec<u8>) -> Gameboy {
+	pub fn new(cart: Vec<u8>, audio_callback: Box<dyn Fn(&[f32])>) -> Gameboy {
 
-		let bus = Rc::new(RefCell::new(Bus::new(cart)));
+		let bus = Rc::new(RefCell::new(Bus::new(cart, audio_callback)));
 
 		Gameboy {
 			bus: Rc::clone(&bus),
@@ -40,6 +40,7 @@ impl Gameboy {
 		let instr_cycles = self.cpu.cycle();
 
 		self.bus.borrow_mut().timer.tick(instr_cycles);
+		self.bus.borrow_mut().apu.tick(instr_cycles);
 		self.bus.borrow_mut().ppu.tick(instr_cycles);
 
 		/* if self.bus.borrow().read_byte(0xFF02) == 0x81 {
