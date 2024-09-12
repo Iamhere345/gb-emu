@@ -37,7 +37,8 @@ pub struct APU {
 
 	frame_sequencer_pos: u8,
 
-	channel_2: SquareChannel1,
+	channel_1: SquareChannel1,
+	channel_2: SquareChannel2,
 
 }
 
@@ -62,7 +63,8 @@ impl APU {
 			sample_clock: 0,
 			frame_sequencer_pos: 0,
 
-			channel_2: SquareChannel1::default(),
+			channel_1: SquareChannel1::default(),
+			channel_2: SquareChannel2::default(),
 		}
 	}
 
@@ -71,6 +73,7 @@ impl APU {
 
 			self.sample_clock = self.sample_clock.wrapping_add(1);
 
+			self.channel_1.tick();
 			self.channel_2.tick();
 
 			if self.sample_clock % 0x2000 == 0 {
@@ -79,18 +82,27 @@ impl APU {
 
 				match self.frame_sequencer_pos {
 					0 => {
-						self.channel_2.tick_length()
+						self.channel_1.tick_length();
+						self.channel_2.tick_length();
 					},
 					2 => {
-						self.channel_2.tick_length()
+						self.channel_1.tick_length();
+						self.channel_2.tick_length();
+
+						self.channel_1.tick_sweep();
 					},
 					4 => {
-						self.channel_2.tick_length()
+						self.channel_1.tick_length();
+						self.channel_2.tick_length();
 					},
 					6 => {
-						self.channel_2.tick_length()
+						self.channel_1.tick_length();
+						self.channel_2.tick_length();
+
+						self.channel_1.tick_sweep();
 					},
 					7 => {
+						self.channel_1.tick_volume();
 						self.channel_2.tick_volume();
 					},
 					_ => {}
@@ -102,32 +114,31 @@ impl APU {
 
 			if self.sample_clock % ((CPU_CLOCK / SAMPLE_RATE) as u32) == 0 {
 				self.buffer[self.buffer_pos] = (self.left_volume as f32 / 7.0)
-					* (if (self.nr51 & 0x20) != 0 {
+					* (if (self.nr51 & 0x10) != 0 {
+						self.channel_1.get_amplitude()
+					} else {
+						0.0
+					} + if (self.nr51 & 0x20) != 0 {
 						self.channel_2.get_amplitude()
 					} else {
 						0.0
-					} / 1.0);
+					} / 2.0);
 				
 				self.buffer[self.buffer_pos + 1] = (self.right_volume as f32 / 7.0)
-				* (if (self.nr51 & 0x20) != 0 {
+				* (if (self.nr51 & 0x10) != 0 {
+					self.channel_1.get_amplitude()
+				} else {
+					0.0
+				} + if (self.nr51 & 0x20) != 0 {
 					self.channel_2.get_amplitude()
 				} else {
 					0.0
-				} / 1.0);
-
-				//println!("L: {} R: {}", self.buffer[self.buffer_pos], self.buffer[self.buffer_pos + 1]);
-
-				if self.channel_2.get_amplitude() > -1.0 {
-					//println!("ch2 amplitude: {}", self.channel_2.get_amplitude());
-				}
+				} / 2.0);
 
 				self.buffer_pos += 2;
 			}
 
 			if self.buffer_pos >= BUFFER_SIZE {
-
-				//println!("pos: {}", self.buffer_pos);
-
 				(self.callback)(self.buffer.as_ref());
 
 				self.buffer_pos = 0;
@@ -140,7 +151,7 @@ impl APU {
 		match addr {
 			// NR52: Audio Master Control
 			0xFF26 => ((self.enabled as u8) << 7) | 0x70
-				| (0)
+				| (self.channel_1.enabled as u8)
 				| (self.channel_2.enabled as u8) << 1
 				| (0 << 2)
 				| (0 << 3),
@@ -152,7 +163,7 @@ impl APU {
 				| ((self.vin_right as u8) << 3)
 				| (self.right_volume),
 			// Channel 1 IO
-			0xFF10 ..= 0xFF14 => 0xFF,
+			0xFF10 ..= 0xFF14 => self.channel_1.read(addr),
 			// Channel 2 IO
 			0xFF16 ..= 0xFF19 => self.channel_2.read(addr),
 			// Channel 3 IO + wave ram
@@ -181,9 +192,9 @@ impl APU {
 				self.right_volume = write & 0x7;
 			},
 			// Channel 1 IO
-			0xFF10 ..= 0xFF14 => {},
+			0xFF10 ..= 0xFF14 => self.channel_1.write(addr, write),
 			// Channel 2 IO
-			0xFF16 ..= 0xFF19 => self.channel_2.write(addr, write),
+			0xFF15 ..= 0xFF19 => self.channel_2.write(addr, write),
 			// Channel 3 IO + wave ram
 			0xFF1A..=0xFF1E | 0xFF30..=0xFF3F => {},
 			// Channel 4 IO
@@ -218,9 +229,218 @@ struct SquareChannel1 {
 
 	length_timer: u8,
 	length_enabled: bool,
+
+	sweep_enabled: bool,
+	dec_freq: bool,
+	sweep_period: u8,
+	sweep_timer: u8,
+	sweep_amount: u8,
+	old_freq: u16,
+
 }
 
 impl SquareChannel1 {
+
+	pub fn tick(&mut self) {
+
+		if self.frequency_timer == 0 {
+
+			self.frequency_timer = (2048 - self.frequency) * 4;
+
+			// wraps around after 7
+			self.wave_position = (self.wave_position + 1) % 8;
+
+		}
+
+		self.frequency_timer -= 1;
+
+	}
+
+	pub fn tick_sweep(&mut self) {
+		if self.sweep_timer > 0 {
+			self.sweep_timer -= 1;
+		}
+
+		if self.sweep_timer == 0 {
+			if self.sweep_period > 0 {
+				self.sweep_timer = self.sweep_period;
+			} else {
+				self.sweep_timer = 8;
+			}
+
+			if self.sweep_enabled && self.sweep_period > 0 {
+				let new_freq = self.calc_frequency();
+
+				if new_freq <= 2047 && self.sweep_amount > 0 {
+					self.frequency = new_freq;
+					self.old_freq = new_freq;
+
+					self.calc_frequency();
+				}
+			}
+		}
+	}
+
+	fn calc_frequency(&mut self) -> u16 {
+
+		let mut new_freq = self.old_freq >> self.sweep_amount;
+
+		if self.dec_freq {
+			new_freq = self.old_freq - new_freq;
+		} else {
+			new_freq = self.old_freq + new_freq;
+		}
+
+		if new_freq > 2047 {
+			self.enabled = false
+		}
+
+		new_freq
+
+	}
+
+	pub fn tick_volume(&mut self) {
+		if self.envelope_period != 0 {
+
+			if self.envelope_timer > 0 {
+				self.envelope_timer -= 1;
+			}
+
+			if self.envelope_timer == 0 {
+				self.envelope_timer = self.envelope_period;
+
+				if (self.current_volume < 0xF && self.inc_volume) || (self.current_volume > 0 && !self.inc_volume) {
+					if self.inc_volume {
+						self.current_volume += 1;
+					} else {
+						self.current_volume -= 1;
+					}
+				}
+			}
+
+		}
+	}
+
+	pub fn tick_length(&mut self) {
+		if self.length_enabled && self.length_timer > 0 {
+			self.length_timer -= 1;
+			
+			if self.length_timer == 0 {
+				self.enabled = false;
+			}
+		}
+	}
+
+	pub fn get_amplitude(&self) -> f32 {
+		if self.dac_enabled && self.enabled {
+			let dac_input = WAVE_DUTY[self.duty_pattern][self.wave_position] as f32 * self.current_volume as f32;
+
+			(dac_input / 7.5) - 1.0
+		} else {
+			0.0
+		}
+	}
+
+	pub fn read(&self, addr: u16) -> u8 {
+		match addr {
+			// NR10: sweep register
+			0xFF10 => (self.sweep_period << 4)
+				| (if self.dec_freq { 0x8 } else { 0x0 })
+				| self.sweep_amount
+				| 0x80,
+			// NR11: duty patten & initial length timer (length is write only)
+			0xFF11 => ((self.duty_pattern as u8) << 6) | 0b0011_1111,
+			// NR12: initial volume & envelope
+			0xFF12 => (self.initial_volume << 4) | ((self.inc_volume as u8) << 3) | self.envelope_period,
+			// NR13: lower 8 bits of the frequency (write only)
+			0xFF13 => 0xFF,
+			// NR14: upper 3 bits of frequency (write only), trigger bit (write only), length timer enabled
+			0xFF14 => ((self.length_enabled as u8) << 6) | 0b1011_1111,
+
+			_ => unreachable!()
+		}
+	}
+
+	pub fn write(&mut self, addr: u16, write: u8) {
+		match addr {
+			// NR10: sweep register
+			0xFF10 => {
+				self.dec_freq = (write & 0x8) != 0;
+                self.sweep_period = write >> 4;
+                self.sweep_amount = write & 0x7;
+			},
+			// NR21: duty patten & initial length timer
+			0xFF11 => {
+				self.duty_pattern = ((write >> 6) & 0b11) as usize;
+				self.length_timer = 64 - (write & 0b0011_1111);
+			},
+			// NR22: initial volume & envelope
+			0xFF12 => {
+				self.initial_volume = write >> 4;
+				self.inc_volume = (write & 0x8) != 0;
+				self.envelope_period = write & 0x7;
+
+				self.dac_enabled = (write & 0b1111_1000) != 0;
+			},
+			// NR23: lower 8 bits of the frequency (write only)
+			0xFF13 => {
+				self.frequency = (self.frequency & 0x700) | write as u16;
+			},
+			// NR24: upper 3 bits of frequency, trigger bit, length timer enabled
+			0xFF14 => {
+				self.frequency = (self.frequency & 0xFF) | (((write & 0x7) as u16) << 8);
+
+				self.length_enabled = ((write >> 6) & 0x1) != 0;
+
+				if self.length_timer == 0 {
+					self.length_timer = 64;
+				}
+
+				let trigger = (write >> 7) != 0;
+
+				if trigger && self.dac_enabled {
+					self.enabled = true;
+
+					// reset envelope
+					self.envelope_timer = self.envelope_period;
+					self.current_volume = self.initial_volume;
+				}
+
+			},
+
+			_ => unreachable!()
+		}
+	}
+
+}
+
+#[derive(Default)]
+struct SquareChannel2 {
+
+	enabled: bool,
+	dac_enabled: bool,
+
+	// index into WAVE_DUTY
+	duty_pattern: usize,
+	// index into WAVE_DUTY[self.wave_pattern]
+	wave_position: usize,
+
+	// decremented every T-state, increments wave_positoin when it reaches 0
+	frequency_timer: u16,
+	frequency: u16,
+
+	initial_volume: u8,
+	current_volume: u8,
+
+	inc_volume: bool,
+	envelope_period: u8,
+	envelope_timer: u8,
+
+	length_timer: u8,
+	length_enabled: bool,
+}
+
+impl SquareChannel2 {
 
 	pub fn tick(&mut self) {
 
@@ -272,8 +492,6 @@ impl SquareChannel1 {
 	pub fn get_amplitude(&self) -> f32 {
 		if self.dac_enabled && self.enabled {
 
-			//println!("duty: {}, vol: {}", WAVE_DUTY[self.duty_pattern][self.wave_position], self.current_volume);
-
 			let dac_input = WAVE_DUTY[self.duty_pattern][self.wave_position] as f32 * self.current_volume as f32;
 
 			(dac_input / 7.5) - 1.0
@@ -291,9 +509,9 @@ impl SquareChannel1 {
 			// NR22: initial volume & envelope
 			0xFF17 => (self.initial_volume << 4) | ((self.inc_volume as u8) << 3) | self.envelope_period,
 			// NR23: lower 8 bits of the frequency (write only)
-			0xFF28 => 0xFF,
+			0xFF18 => 0xFF,
 			// NR24: upper 3 bits of frequency (write only), trigger bit (write only), length timer enabled
-			0xFF29 => ((self.length_enabled as u8) << 6) | 0b1011_1111,
+			0xFF19 => ((self.length_enabled as u8) << 6) | 0b1011_1111,
 
 			_ => unreachable!()
 		}
