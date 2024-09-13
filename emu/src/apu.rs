@@ -401,6 +401,15 @@ impl SquareChannel1 {
 				if trigger && self.dac_enabled {
 					self.enabled = true;
 
+					self.old_freq = self.frequency;
+					self.sweep_timer = if self.sweep_period > 0 { self.sweep_period } else { 8 };
+
+					self.sweep_enabled = self.sweep_period > 0 || self.sweep_amount > 0;
+
+					if self.sweep_amount > 0 {
+						self.calc_frequency();
+					}
+
 					// reset envelope
 					self.envelope_timer = self.envelope_period;
 					self.current_volume = self.initial_volume;
