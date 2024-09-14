@@ -1,5 +1,5 @@
 // used for setting bits in IE and IF
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum InterruptFlag {
 	VBlank = 1 << 0,
 	LCDC = 1 << 1,

@@ -4,7 +4,7 @@ pub struct WaveChannel {
 	dac_enabled: bool,
 
 	wave_ram: [u8; 16],
-	wave_position: usize,
+	pub wave_position: usize,
 
 	// encoded version of volume shift
 	output_level: u8,

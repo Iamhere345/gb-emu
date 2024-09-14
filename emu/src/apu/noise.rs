@@ -93,6 +93,8 @@ impl NoiseChannel {
 
 	pub fn read(&self, addr: u16) -> u8 {
 		match addr {
+			// NR40: does not exist
+			0xFF1F => 0xFF,
 			// NR41: initial length timer (write-only)
 			0xFF20 => 0xFF,
 			// NR42: initial volume & envelope
@@ -108,6 +110,8 @@ impl NoiseChannel {
 
 	pub fn write(&mut self, addr: u16, write: u8) {
 		match addr {
+			//NR40: does not exist
+			0xFF1F => {},
 			// NR41: duty patten & initial length timer
 			0xFF20 => self.length_timer = (64 - (write & 0b0011_1111)) as u16,
 			// NR42: initial volume & envelope

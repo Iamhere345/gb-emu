@@ -35,42 +35,15 @@ impl Gameboy {
 
 	}
 
-	pub fn tick(&mut self) -> u64 {
+	pub fn tick(&mut self) -> bool {
 
 		let instr_cycles = self.cpu.cycle();
 
 		self.bus.borrow_mut().timer.tick(instr_cycles);
-		self.bus.borrow_mut().apu.tick(instr_cycles);
+		let buffer_full = self.bus.borrow_mut().apu.tick(instr_cycles);
 		self.bus.borrow_mut().ppu.tick(instr_cycles);
 
-		/* if self.bus.borrow().read_byte(0xFF02) == 0x81 {
-
-			let serial_char: char = self.bus.borrow().read_byte(0xFF01) as char;
-
-			//print!("{}", serial_char);
-
-			self.bus.borrow_mut().write_byte(0xFF02, 0);
-		} */
-
-		instr_cycles
-
-	}
-
-	pub fn run_frame(&mut self) {
-
-		loop {
-
-			let cycles = self.tick();
-
-			self.cycles += cycles;
-
-			if self.cycles >= CYCLES_PER_FRAME {
-				self.cycles -= CYCLES_PER_FRAME;
-				break;
-			}
-
-		}
-
+		buffer_full
 	}
 
 	pub fn run_scanline(&mut self) {
@@ -78,9 +51,16 @@ impl Gameboy {
 		let current_ly = self.bus.borrow().read_register(bus::MemRegister::LY);
 
 		while self.bus.borrow().read_register(bus::MemRegister::LY) != current_ly.wrapping_add(1) {
-			self.cycles += self.tick();
+			self.tick();
 		}
 
+	}
+
+	pub fn load_bootrom(&mut self, bootrom: Vec<u8>, bootrom_enable: bool) {
+		self.bus.borrow_mut().bootrom = bootrom;
+		self.bus.borrow_mut().bootrom_loaded = bootrom_enable;
+
+		if bootrom_enable { self.cpu.pc = 0 }
 	}
 
 }

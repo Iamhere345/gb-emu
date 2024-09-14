@@ -52,7 +52,7 @@ impl MBC for MBC1 {
 	fn read(&self, addr: u16) -> u8 {
 
 		match addr {
-			// rom bank 1
+			// rom bank 0
 			0		..= 0x3FFF	=> {
 				let bank = if self.banking_mode {
 					(self.upper_bank as usize) << 5

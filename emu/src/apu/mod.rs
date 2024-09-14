@@ -29,12 +29,13 @@ pub struct APU {
 	vin_right: bool,
 
 	buffer: Box<[f32; BUFFER_SIZE]>,
-	buffer_pos: usize,
+	pub buffer_pos: usize,
 
 	callback: Box<dyn Fn(&[f32])>,
 
-	sample_clock: u32,
+	pub cpu_clock: usize,
 
+	sample_clock: u32,
 	frame_sequencer_pos: u8,
 
 	channel_1: SquareChannel1,
@@ -62,6 +63,8 @@ impl APU {
 
 			callback: callback,
 
+			cpu_clock: CPU_CLOCK,
+
 			sample_clock: 0,
 			frame_sequencer_pos: 0,
 
@@ -72,7 +75,10 @@ impl APU {
 		}
 	}
 
-	pub fn tick(&mut self, cycles: u64) {
+	pub fn tick(&mut self, cycles: u64) -> bool {
+
+		let mut buffer_full = false;
+
 		for _ in 0..cycles {
 
 			self.sample_clock = self.sample_clock.wrapping_add(1);
@@ -127,7 +133,7 @@ impl APU {
 				self.frame_sequencer_pos = (self.frame_sequencer_pos + 1) % 8;
 			}
 
-			if self.sample_clock % ((CPU_CLOCK / SAMPLE_RATE) as u32) == 0 {
+			if self.sample_clock % ((self.cpu_clock / SAMPLE_RATE) as u32) == 0 {
 				self.buffer[self.buffer_pos] = (self.left_volume as f32 / 7.0)
 					* ((if (self.nr51 & 0x10) != 0 {
 						self.channel_1.get_amplitude()
@@ -173,9 +179,13 @@ impl APU {
 				(self.callback)(self.buffer.as_ref());
 
 				self.buffer_pos = 0;
+
+				buffer_full = true
 			}
 
 		}
+
+		buffer_full
 	}
 
 	pub fn read_byte(&self, addr: u16) -> u8 {
@@ -198,11 +208,11 @@ impl APU {
 			// Channel 2 IO
 			0xFF16 ..= 0xFF19 => self.channel_2.read(addr),
 			// Channel 3 IO + wave ram
-			0xFF1A..=0xFF1E | 0xFF30..=0xFF3F => self.channel_3.read(addr),
+			0xFF1A ..= 0xFF1E | 0xFF30..=0xFF3F => self.channel_3.read(addr),
 			// Channel 4 IO
-			0xFF1F..=0xFF23 => self.channel_4.read(addr),
+			0xFF1F ..= 0xFF23 => self.channel_4.read(addr),
 
-			_ => panic!("0x{:X}", addr)
+			_ => 0xFF
 		}
 	}
 
@@ -210,8 +220,23 @@ impl APU {
 		match addr {
 			// NR52: Audio Master Control
 			0xFF26 => {
-				// TODO clear registers/state when disabled
-				self.enabled = (write & 0x80) != 0
+				let enabled = (write & 0x80) != 0;
+
+				if !enabled && self.enabled {
+					for addr in 0xFF10..0xFF25 {
+						self.write_byte(addr, 0);
+					}
+
+					self.enabled = false;
+				} else if enabled && !self.enabled {
+					self.enabled = true;
+
+					self.frame_sequencer_pos = 0;
+
+					self.channel_1.wave_position = 0;
+					self.channel_2.wave_position = 0;
+					self.channel_3.wave_position = 0;
+				}
 			},
 			// NR51: sound panning
 			0xFF25 => self.nr51 = write,
@@ -228,11 +253,11 @@ impl APU {
 			// Channel 2 IO
 			0xFF15 ..= 0xFF19 => self.channel_2.write(addr, write),
 			// Channel 3 IO + wave ram
-			0xFF1A..=0xFF1E | 0xFF30..=0xFF3F => self.channel_3.write(addr, write),
+			0xFF1A ..= 0xFF1E | 0xFF30..=0xFF3F => self.channel_3.write(addr, write),
 			// Channel 4 IO
-			0xFF1F..=0xFF23 => self.channel_4.write(addr, write),
+			0xFF1F ..= 0xFF23 => self.channel_4.write(addr, write),
 
-			_ => panic!("0x{:X}", addr)
+			_ => println!("invalid apu write 0x{:X}", addr)
 		}
 	}
 

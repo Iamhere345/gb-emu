@@ -15,7 +15,7 @@ pub struct SquareChannel1 {
 	// index into WAVE_DUTY
 	duty_pattern: usize,
 	// index into WAVE_DUTY[self.wave_pattern]
-	wave_position: usize,
+	pub wave_position: usize,
 
 	// decremented every T-state, increments wave_positoin when it reaches 0
 	frequency_timer: u16,
@@ -233,7 +233,7 @@ pub struct SquareChannel2 {
 	// index into WAVE_DUTY
 	duty_pattern: usize,
 	// index into WAVE_DUTY[self.wave_pattern]
-	wave_position: usize,
+	pub wave_position: usize,
 
 	// decremented every T-state, increments wave_positoin when it reaches 0
 	frequency_timer: u16,

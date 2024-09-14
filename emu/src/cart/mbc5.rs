@@ -57,7 +57,7 @@ impl MBC for MBC5 {
 	fn read(&self, addr: u16) -> u8 {
 
 		match addr {
-			// rom bank 1
+			// rom bank 0
 			0		..= 0x3FFF	=> self.rom[addr as usize],
 			// rom bank x
 			0x4000	..= 0x7FFF	=> {

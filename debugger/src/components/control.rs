@@ -1,9 +1,11 @@
 use std::fs;
 use eframe::egui::*;
-use native_dialog::{FileDialog, Filter};
+use native_dialog::FileDialog;
 
 use emu::Gameboy;
-use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink};
+use rodio::{buffer::SamplesBuffer, OutputStreamHandle, Sink};
+
+pub const CPU_CLOCK: usize = 4194304;
 
 pub struct Control {
 	pub paused: bool,
@@ -76,7 +78,9 @@ impl Control {
 					2 => 4,
 					4 => 8,
 					_ => 1
-				}
+				};
+
+				emu.bus.borrow_mut().apu.cpu_clock = CPU_CLOCK * self.speed as usize;
 			}
 
 			if ui.button(format!("Scale: {}x", self.scale)).clicked() {
@@ -90,7 +94,7 @@ impl Control {
 
 			if ui.button("Step").clicked() {
 				for _ in 0..self.speed {
-					emu.cycles += emu.tick();
+					emu.tick();
 				}
 			}
 
@@ -228,9 +232,8 @@ impl Control {
 				sink.append(SamplesBuffer::new(2, 48000, buffer));
 			}));
 
-			if enable_bootrom {
-				emu.bus.borrow_mut().bootrom_loaded = true;
-				emu.cpu.pc = 0;
+			if let Ok(bootrom) = fs::read("roms/bootrom.gb") {
+				emu.load_bootrom(bootrom, enable_bootrom);
 			}
 
 			self.load_sram(emu);

@@ -1,5 +1,6 @@
 mod mbc0;
 mod mbc1;
+mod mbc2;
 mod mbc3;
 mod mbc5;
 
@@ -25,6 +26,7 @@ pub fn create_cart(rom: Vec<u8>) -> Box<dyn MBC> {
 	match rom[0x147] {
 		0x0 	=> Box::new(mbc0::MBC0::new(rom)),
 		0x1 | 0x2 | 0x3 => Box::new(mbc1::MBC1::new(rom, ram_size)),
+		0x5 | 0x6 => Box::new(mbc2::MBC2::new(rom)),
 		0xF | 0x10 | 0x11 | 0x12 | 0x13 => Box::new(mbc3::MBC3::new(rom, ram_size)),
 		0x19 | 0x1A | 0x1B | 0x1C | 0x1D | 0x1E => Box::new(mbc5::MBC5::new(rom, ram_size)),
 

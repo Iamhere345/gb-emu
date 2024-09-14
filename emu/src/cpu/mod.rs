@@ -125,8 +125,6 @@ impl CPU {
 					// handle interrupt
 					if self.halted { 
 						self.halted = false;
-			
-						return 0;
 					}
 					
 					// clear the bit in IF

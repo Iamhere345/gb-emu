@@ -7,8 +7,6 @@ use emu::joypad::*;
 
 use crate::components::{control::Control, cpu::Cpu, display::Display, ppu::Ppu, cart::Cart};
 
-//const CYCLES_PER_FRAME: usize = (4194304.0 / 60.0) as usize;
-const CYCLES_PER_FRAME: u64 = 69905;
 
 const BTN_A: Key 		= Key::Z;
 const BTN_B: Key 		= Key::X;
@@ -24,7 +22,7 @@ const DPAD_RIGHT: Key 	= Key::ArrowRight;
 pub struct Debugger {
 	emu: Gameboy,
 
-	audio_stream: OutputStream,
+	_audio_stream: OutputStream,
 	stream_handle: OutputStreamHandle,
 
 	display: Display,
@@ -54,7 +52,7 @@ impl Debugger {
 		Self {
 			emu: emu,
 
-			audio_stream: stream,
+			_audio_stream: stream,
 			stream_handle: stream_handle,
 
 			display: Display::new(cc),
@@ -62,7 +60,7 @@ impl Debugger {
 			control: Control::new(),
 			cpu: Cpu::new(),
 			ppu: Ppu::new(),
-			cart: Cart::new()
+			cart: Cart::new(),
 		}
 	}
 }
@@ -101,29 +99,13 @@ impl App for Debugger {
 		if !self.control.paused {
 
 			'update:
-			for _ in 0..self.control.speed {
-
-				loop {
-
-					for i in self.control.breakpoints.iter() {
-						if self.emu.cpu.pc == *i {
-							self.control.paused = true;
-							break 'update;
-						}
+			while !self.emu.tick() {
+				for i in self.control.breakpoints.iter() {
+					if self.emu.cpu.pc == *i {
+						self.control.paused = true;
+						break 'update;
 					}
-
-					let cycles = self.emu.tick();
-
-					self.emu.cycles += cycles;
-		
-					if self.emu.cycles >= CYCLES_PER_FRAME {
-						self.emu.cycles -= CYCLES_PER_FRAME;
-						break;
-					}
-		
 				}
-
-				
 			}
 
 		}
@@ -133,7 +115,7 @@ impl App for Debugger {
 			ui.heading("gb-emu");
 			
 			ui.separator();
-			
+
 			self.control.show(ctx, ui, &mut self.emu, &mut self.stream_handle);
 			
 			ui.separator();
@@ -163,7 +145,7 @@ impl App for Debugger {
 		egui::CentralPanel::default().show(ctx, |ui| {
 			self.display.show(ctx, ui, &mut self.emu, self.control.scale)
 		});
-		
+
 		ctx.request_repaint();
 		
 	}
