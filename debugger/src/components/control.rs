@@ -68,20 +68,8 @@ impl Control {
 		ui.strong("Control");
 		
 		ui.horizontal(|ui| {
-			if ui.button(if self.paused == true { "Start" } else { "Stop" }).clicked() {
-				self.paused = !self.paused;
-			}
-
-			if ui.button(format!("Speed: {}x", self.speed)).clicked() {
-				self.speed = match self.speed {
-					1 => 2,
-					2 => 4,
-					4 => 8,
-					_ => 1
-				};
-
-				emu.bus.borrow_mut().apu.cpu_clock = CPU_CLOCK * self.speed as usize;
-			}
+			
+			self.show_start_speed(ui, emu);
 
 			if ui.button(format!("Scale: {}x", self.scale)).clicked() {
 				self.scale = match self.scale {
@@ -118,24 +106,7 @@ impl Control {
 
 			}
 
-			if ui.button("Select ROM").clicked() {
-
-				let rom_path = FileDialog::new()
-					.set_location(std::env::current_dir().unwrap().as_path())
-					.add_filter("GB Rom", &["gb", "gbc"])
-					.show_open_single_file()
-					.unwrap();
-
-				if let Some(rom) = rom_path {
-					self.rom_path = rom.to_str().unwrap().to_string();
-
-					self.save_sram(emu);
-					self.reset_emu(emu, stream_handle, self.enable_bootrom);
-
-					self.old_rom_path = self.rom_path.clone();
-				}
-
-			}
+			self.show_select_rom(ui, emu, stream_handle);
 
 			ui.checkbox(&mut self.enable_bootrom, "Enable Bootrom");
 
@@ -189,6 +160,44 @@ impl Control {
 
 		});
 
+	}
+
+	pub fn show_select_rom(&mut self, ui: &mut Ui, emu: &mut Gameboy, stream_handle: &mut OutputStreamHandle) {
+		if ui.button("Select ROM").clicked() {
+
+			let rom_path = FileDialog::new()
+				.set_location(std::env::current_dir().unwrap().as_path())
+				.add_filter("GB Rom", &["gb", "gbc"])
+				.show_open_single_file()
+				.unwrap();
+
+			if let Some(rom) = rom_path {
+				self.rom_path = rom.to_str().unwrap().to_string();
+
+				self.save_sram(emu);
+				self.reset_emu(emu, stream_handle, self.enable_bootrom);
+
+				self.old_rom_path = self.rom_path.clone();
+			}
+
+		}
+	}
+
+	pub fn show_start_speed(&mut self, ui: &mut Ui, emu: &mut Gameboy) {
+		if ui.button(if self.paused == true { "Start" } else { "Stop" }).clicked() {
+			self.paused = !self.paused;
+		}
+
+		if ui.button(format!("Speed: {}x", self.speed)).clicked() {
+			self.speed = match self.speed {
+				1 => 2,
+				2 => 4,
+				4 => 8,
+				_ => 1
+			};
+
+			emu.bus.borrow_mut().apu.cpu_clock = CPU_CLOCK * self.speed as usize;
+		}
 	}
 
 	pub fn save_sram(&self, emu: &Gameboy) {

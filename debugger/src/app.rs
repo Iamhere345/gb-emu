@@ -1,4 +1,4 @@
-use eframe::{egui::{self, Key}, App};
+use eframe::{egui::{self, Key, Vec2}, App};
 use rodio::buffer::SamplesBuffer;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 use gilrs::Gilrs;
@@ -18,6 +18,9 @@ const DPAD_UP: Key 		= Key::ArrowUp;
 const DPAD_DOWN: Key 	= Key::ArrowDown;
 const DPAD_LEFT: Key 	= Key::ArrowLeft;
 const DPAD_RIGHT: Key 	= Key::ArrowRight;
+
+const SCREEN_WIDTH: usize = 160;
+const SCREEN_HEIGHT: usize = 144;
 
 #[derive(PartialEq)]
 enum DpadDir {
@@ -42,6 +45,11 @@ pub struct Debugger {
 	cpu: Cpu,
 	ppu: Ppu,
 	cart: Cart,
+
+	debug_mode: bool,
+	just_changed_mode: bool,
+
+	window_scale: f32,
 }
 
 impl Debugger {
@@ -74,6 +82,11 @@ impl Debugger {
 			cpu: Cpu::new(),
 			ppu: Ppu::new(),
 			cart: Cart::new(),
+
+			debug_mode: false,
+			just_changed_mode: false,
+
+			window_scale: 6.0,
 		}
 	}
 
@@ -128,6 +141,12 @@ impl Debugger {
 		if self.is_gamepad_input_down(&Button::Start, DpadDir::None) || self.is_keyboard_input_down(BTN_START, ctx) { self.emu.btn_down(GBInput::BtnStart) } else { self.emu.btn_up(GBInput::BtnStart) }
 		if self.is_gamepad_input_down(&Button::Select, DpadDir::None) || self.is_keyboard_input_down(BTN_SELECT, ctx) { self.emu.btn_down(GBInput::BtnSelect) } else { self.emu.btn_up(GBInput::BtnSelect) }
 
+		ctx.input(|input| {
+			if input.key_pressed(Key::Escape) {
+				self.debug_mode = !self.debug_mode;
+				self.just_changed_mode = true;
+			}
+		})
 		
 	}
 }
@@ -136,6 +155,18 @@ impl App for Debugger {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 		
 		self.handle_input(ctx);
+
+		if self.just_changed_mode {
+			self.just_changed_mode = false;
+
+			if self.debug_mode {
+				ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(1280.0, 720.0)));
+			} else {
+				ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(
+					Vec2::new(SCREEN_WIDTH as f32 * self.window_scale, SCREEN_HEIGHT as f32 * self.window_scale))
+				);
+			}
+		}
 
 		if !self.control.paused {
 
@@ -151,40 +182,69 @@ impl App for Debugger {
 
 		}
 
-		egui::SidePanel::left("left_pannel").show(ctx, |ui| {
-			
-			ui.heading("gb-emu");
-			
-			ui.separator();
+		if self.debug_mode {
+			egui::SidePanel::left("left_pannel").show(ctx, |ui| {
+				
+				ui.heading("gb-emu");
+				
+				ui.separator();
 
-			self.control.show(ctx, ui, &mut self.emu, &mut self.stream_handle);
-			
-			ui.separator();
-			
-			self.cpu.show(ctx, ui, &mut self.emu);
-			
-			ui.separator();
-			
-			self.ppu.show(ctx, ui, &mut self.emu);
+				self.control.show(ctx, ui, &mut self.emu, &mut self.stream_handle);
+				
+				ui.separator();
+				
+				self.cpu.show(ctx, ui, &mut self.emu);
+				
+				ui.separator();
+				
+				self.ppu.show(ctx, ui, &mut self.emu);
 
-			ui.separator();
+				ui.separator();
 
-			self.cart.show(ctx, ui, &mut self.emu);
+				self.cart.show(ctx, ui, &mut self.emu);
 
-		});
-		
-		egui::SidePanel::right("right_pannel").show(ctx, |ui| {
+			});
 			
-			ui.strong("VRAM Viewer");
-			
-			ui.separator();
-			
-			self.ppu.vram_viewer(ctx, ui, &mut self.emu);
-			
-		});
+			egui::SidePanel::right("right_pannel").show(ctx, |ui| {
+				
+				ui.strong("VRAM Viewer");
+				
+				ui.separator();
+				
+				self.ppu.vram_viewer(ctx, ui, &mut self.emu);
+				
+			});
+
+		} else {
+
+			egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
+				ui.horizontal(|ui| {
+					self.control.show_select_rom(ui, &mut self.emu, &mut self.stream_handle);
+
+					self.control.show_start_speed(ui, &mut self.emu);
+
+					if ui.button(format!("Scale: {}x", self.window_scale)).clicked() {
+						self.window_scale = match self.window_scale as u32 {
+							1 => 2.0,
+							2 => 4.0,
+							4 => 6.0,
+							_ => 1.0
+						};
+
+						ctx.send_viewport_cmd(
+							egui::ViewportCommand::InnerSize(Vec2::new(SCREEN_WIDTH as f32 * self.window_scale, SCREEN_HEIGHT as f32 * self.window_scale))
+						);
+
+
+					}
+				});
+
+			});
+
+		}
 
 		egui::CentralPanel::default().show(ctx, |ui| {
-			self.display.show(ctx, ui, &mut self.emu, self.control.scale)
+			self.display.show(ctx, ui, &mut self.emu, self.control.scale, self.debug_mode)
 		});
 
 		ctx.request_repaint();

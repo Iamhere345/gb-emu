@@ -24,7 +24,7 @@ impl Display {
 		}
 	}
 
-	pub fn show(&mut self, _ctx: &Context, ui: &mut Ui, emu: &mut Gameboy, scale: usize) {
+	pub fn show(&mut self, _ctx: &Context, ui: &mut Ui, emu: &mut Gameboy, scale: usize, debugger: bool) {
 
 		let mut display_buf = vec![Color32::default(); SCREEN_WIDTH * SCREEN_HEIGHT];
 
@@ -47,9 +47,14 @@ impl Display {
 		self.screen_tex.set(colour_image, TextureOptions::NEAREST);
 
 		let image = Image::new(&self.screen_tex);
-        let image = image.fit_to_exact_size(vec2((SCREEN_WIDTH * scale) as f32, (SCREEN_WIDTH * scale) as f32));
-        //image.paint_at(ui, ui.ctx().available_rect());
-		ui.add(image);
+        let image = image.maintain_aspect_ratio(true).fit_to_exact_size(vec2((SCREEN_WIDTH * scale) as f32, (SCREEN_WIDTH * scale) as f32));
+
+		if debugger {
+			ui.add(image);
+		} else {
+        	image.paint_at(ui, ui.ctx().available_rect());
+		}
+		
 
 	}
 
