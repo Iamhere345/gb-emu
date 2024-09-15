@@ -57,7 +57,7 @@ pub struct Debugger {
 impl Debugger {
 	pub fn new(cc: &eframe::CreationContext) -> Self {
 
-		let cart = std::fs::read("roms/dmg-acid2.gb").unwrap();
+		let cart = vec![0u8; 32 * 1024];
 
 		let (stream, stream_handle) = OutputStream::try_default().unwrap();
         let sink = Sink::try_new(&stream_handle).unwrap();

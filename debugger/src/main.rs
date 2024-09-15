@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 use eframe::{egui::{Vec2, ViewportBuilder}, run_native, NativeOptions};
 use app::Debugger;
 
