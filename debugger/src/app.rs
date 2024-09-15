@@ -84,7 +84,7 @@ impl Debugger {
 			cart: Cart::new(),
 
 			debug_mode: false,
-			just_changed_mode: false,
+			just_changed_mode: true,
 
 			window_scale: 6.0,
 		}

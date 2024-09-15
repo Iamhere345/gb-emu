@@ -116,16 +116,20 @@ impl CPU {
 			let if_flags = self.bus.borrow().read_register(MemRegister::IF);
 			let ie_flags = self.bus.borrow().read_register(MemRegister::IE);
 
+			if if_flags & ie_flags != 0 {
+				// handle interrupt
+				if self.halted { 
+					self.halted = false;
+				}
+			}
+
 			for i in 0..4 {
 
-				if ((if_flags >> i) & 1) == 1 && ((ie_flags >> i) & 1) == 1 {
+				if ((if_flags >> i) & 1) == 1 && ((ie_flags >> i) & 1) == 1 && self.ime {
 					let flag: InterruptFlag = InterruptFlag::from_u8(((if_flags >> i) & 1) << i);
 					let source = InterruptSource::from_flag(flag);
 
-					// handle interrupt
-					if self.halted { 
-						self.halted = false;
-					}
+					
 					
 					// clear the bit in IF
 					let new_if = self.bus.borrow().read_register(MemRegister::IF) & !(flag as u8);
