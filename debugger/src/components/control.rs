@@ -18,7 +18,7 @@ pub struct Control {
 	pub rom_list: Vec<&'static str>,
 	pub rom_index: usize,
 
-	enable_bootrom: bool,
+	pub enable_bootrom: bool,
 
 	pub breakpoints: Vec<u16>,
 	breakpoints_window_open: bool,

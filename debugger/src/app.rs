@@ -50,6 +50,8 @@ pub struct Debugger {
 	just_changed_mode: bool,
 
 	window_scale: f32,
+
+	show_help: bool,
 }
 
 impl Debugger {
@@ -87,6 +89,8 @@ impl Debugger {
 			just_changed_mode: true,
 
 			window_scale: 6.0,
+
+			show_help: false,
 		}
 	}
 
@@ -219,10 +223,9 @@ impl App for Debugger {
 
 			egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
 				ui.horizontal(|ui| {
-					self.control.show_select_rom(ui, &mut self.emu, &mut self.stream_handle);
-
+					
 					self.control.show_start_speed(ui, &mut self.emu);
-
+					
 					if ui.button(format!("Scale: {}x", self.window_scale)).clicked() {
 						self.window_scale = match self.window_scale as u32 {
 							1 => 2.0,
@@ -230,13 +233,49 @@ impl App for Debugger {
 							4 => 6.0,
 							_ => 1.0
 						};
-
+						
 						ctx.send_viewport_cmd(
 							egui::ViewportCommand::InnerSize(Vec2::new(SCREEN_WIDTH as f32 * self.window_scale, SCREEN_HEIGHT as f32 * self.window_scale))
 						);
-
-
+						
+						
 					}
+
+					self.control.show_select_rom(ui, &mut self.emu, &mut self.stream_handle);
+
+					if ui.button("Help").clicked() {
+						self.show_help = !self.show_help;
+					}
+
+					if self.show_help {
+						egui::Window::new("Help").show(ctx, |ui| {
+							ui.heading("Controls");
+
+							ui.separator();
+
+							ui.strong("Keyboard");
+
+							ui.label("Z: A");
+							ui.label("X: B");
+							ui.label("Arrow keys: Dpad");
+							ui.label("Enter: Start");
+							ui.label("Backspace: Select");
+
+							ui.separator();
+
+							ui.strong("Controller");
+
+							ui.label("South / X / A: A");
+							ui.label("East / O / B: B");
+							ui.label("Left stick / Dpad: Dpad");
+							ui.label("Start: Start");
+							ui.label("Select / Share: Select");
+
+						});
+					}
+
+					ui.checkbox(&mut self.control.enable_bootrom, "Enable Bootrom");
+
 				});
 
 			});
