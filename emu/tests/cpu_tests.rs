@@ -54,7 +54,7 @@ struct Test {
 #[test]
 fn sm83_test_data() {
 
-	let mut gb = Gameboy::new(Vec::new(), Box::new(|buffer| {}));
+	let mut gb = Gameboy::new(Vec::new(), Box::new(|_| {}));
 
 	for (i, entry_res) in fs::read_dir("../tests/sm83-test-data").expect("TEST ERROR: unable to read test data").enumerate() {
 

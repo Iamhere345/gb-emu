@@ -1,5 +1,6 @@
 use cpu::*;
 use bus::Bus;
+use joypad::GBInput;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,8 +13,6 @@ pub mod ppu;
 pub mod joypad;
 pub mod cart;
 pub mod apu;
-
-const CYCLES_PER_FRAME: u64 = 69905;
 
 pub struct Gameboy {
 	pub bus: Rc<RefCell<Bus>>,
@@ -61,6 +60,14 @@ impl Gameboy {
 		self.bus.borrow_mut().bootrom_loaded = bootrom_enable;
 
 		if bootrom_enable { self.cpu.pc = 0 }
+	}
+
+	pub fn btn_down(&mut self, btn: GBInput) {
+		self.bus.borrow_mut().joypad.btn_down(btn);
+	}
+
+	pub fn btn_up(&mut self, btn: GBInput) {
+		self.bus.borrow_mut().joypad.btn_up(btn);
 	}
 
 }
